@@ -15,6 +15,10 @@ Frontend-first product and UX design for the mock-driven MVP.
 9. [Frontend Coordinate System](./frontend-coordinate-system.md)
 10. [Editor Interaction State Machine](./editor-interaction-state-machine.md)
 11. [Gen Alpha Product & Visual Vision](./gen-alpha-product-vision.md)
+12. [UI Design System](./ui-design-system.md)
+13. [UI Component Specification](./ui-component-spec.md)
+14. [Low-Fidelity Wireframes](./low-fidelity-wireframes.md)
+15. [Final Preview Screen](./final-preview-screen.md)
 
 ## Design principles
 
@@ -29,3 +33,19 @@ Frontend-first product and UX design for the mock-driven MVP.
 - Approved/stale states are explicit; no silent resizing or overwrite.
 - Sharing/remixing is designed as creation, not purchase pressure.
 - Privacy is the default for uploaded artwork and share previews.
+- Feature components consume semantic design tokens rather than hardcoded styling.
+- Low-fidelity wireframes define information hierarchy, not final branding.
+
+## Pre-code design status
+
+The branch now contains:
+- IA and customer flows;
+- responsive interaction model;
+- geometry and gesture contracts;
+- mock API semantics;
+- design system tokens;
+- reusable UI component rules;
+- mobile/tablet/desktop wireframes;
+- Final Preview approval UX.
+
+The next implementation step is a low-fidelity React shell using these contracts before the production canvas editor.
