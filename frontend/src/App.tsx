@@ -35,9 +35,10 @@ function App() {
     const stored = readStoredJson<Draft>('pm-draft')
     return stored ? normalizeDraft(stored) : createDraft()
   })
-  const [approved, setApproved] = useState<ApprovedDesign | null>(() =>
-    readStoredJson<ApprovedDesign>('pm-approved')
-  )
+  const [approved, setApproved] = useState<ApprovedDesign | null>(() => {
+    const stored = readStoredJson<ApprovedDesign>('pm-approved')
+    return stored ? { ...stored, draft: normalizeDraft(stored.draft) } : null
+  })
 
   const updateDraft = (next: Draft) => {
     const normalized = normalizeDraft({
@@ -385,7 +386,25 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
 
   const moveLayer = (direction: 1 | -1) => {
     if (!selected) return
-    updateElement(selected.id, { zOrder: selected.zOrder + direction })
+
+    const ordered = draft.elements
+      .filter(element => element.side === draft.activeSide)
+      .sort((a, b) => a.zOrder - b.zOrder)
+
+    const index = ordered.findIndex(element => element.id === selected.id)
+    const targetIndex = index + direction
+    if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return
+
+    const target = ordered[targetIndex]
+
+    commit({
+      ...draft,
+      elements: draft.elements.map(element => {
+        if (element.id === selected.id) return { ...element, zOrder: target.zOrder }
+        if (element.id === target.id) return { ...element, zOrder: selected.zOrder }
+        return element
+      })
+    })
   }
 
   const setSide = (side: Side) => {
@@ -688,8 +707,10 @@ function DesignCheck({ draft }: { draft: Draft }) {
       </div>
     )}
 
-    <div className="check-card good">✓ {t('placementGood')}</div>
-    <div className="check-card good">✓ {t('insideArea')}</div>
+    {!issues.some(issue => issue.code === 'OUTSIDE_PRINT_AREA') && <>
+      <div className="check-card good">✓ {t('placementGood')}</div>
+      <div className="check-card good">✓ {t('insideArea')}</div>
+    </>}
 
     {status !== 'BLOCKED'
       ? <Link className="btn primary full" to="/preview">{t('continue')}</Link>
