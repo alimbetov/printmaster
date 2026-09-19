@@ -495,6 +495,32 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     commit({ ...draft, activeSide: side })
   }
 
+  const changeSize = (size: Size) => {
+    if (size === draft.size) return
+
+    const oldProfile = getPrintProfile(draft.productId, draft.size)
+    const nextProfile = getPrintProfile(draft.productId, size)
+
+    const elements = draft.elements.map(element => {
+      const oldZone = element.side === 'FRONT' ? oldProfile.front : oldProfile.back
+      const nextZone = element.side === 'FRONT' ? nextProfile.front : nextProfile.back
+      const nx = (element.xMm - oldZone.xMm) / oldZone.widthMm
+      const ny = (element.yMm - oldZone.yMm) / oldZone.heightMm
+
+      return {
+        ...element,
+        xMm: Number((nextZone.xMm + nx * nextZone.widthMm).toFixed(3)),
+        yMm: Number((nextZone.yMm + ny * nextZone.heightMm).toFixed(3))
+      }
+    })
+
+    commit({
+      ...draft,
+      size,
+      elements
+    })
+  }
+
   const resetPlacementFrame = () => {
     const target = normalizePlacementFrame({
       x: .08,
@@ -611,7 +637,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
           color={draft.color}
           size={draft.size}
           onColor={color => commit({ ...draft, color })}
-          onSize={size => commit({ ...draft, size })}
+          onSize={changeSize}
         />
 
         <div className="placement-summary">
@@ -683,13 +709,13 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
             color={draft.color}
             size={draft.size}
             onColor={color => commit({ ...draft, color })}
-            onSize={size => commit({ ...draft, size })}
+            onSize={changeSize}
           />
           <EditorInspector
             selected={selected}
             zoneCenter={{
-              xMm: zone.xMm + zone.widthMm / 2,
-              yMm: zone.yMm + zone.heightMm / 2
+              xMm: placementMm.xMm + placementMm.widthMm / 2,
+              yMm: placementMm.yMm + placementMm.heightMm / 2
             }}
             onUpdate={patch => selected && updateElement(selected.id, patch)}
             onDelete={removeSelected}
