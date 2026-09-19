@@ -68,3 +68,32 @@ main{max-width:1440px;margin:0 auto}.hero{min-height:680px;display:grid;grid-tem
   .cart-preview{height:180px}
   .cart-preview .konva-host{min-height:180px;height:180px;padding:2px}
 }
+
+@media(max-width:520px){
+  .editor-top{
+    padding:6px 8px;
+    gap:6px;
+    grid-template-columns:minmax(0,1fr) auto auto;
+  }
+  .variant-pill{
+    min-width:0;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    padding:0 10px;
+  }
+  .side-switch button{padding:0 9px}
+  .editor-top .locale{
+    margin-left:0;
+    padding:7px 6px;
+    max-width:54px;
+  }
+  .editor-top>.btn{padding:0 10px}
+  .editor-top .status{
+    max-width:150px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+}
