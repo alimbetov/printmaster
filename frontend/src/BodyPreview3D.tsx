@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { Draft, DesignElement } from './types'
+import type {
+  Draft,
+  DesignElement,
+  PlacementFrameNormalized
+} from './types'
 import { getPrintProfile, products } from './mock'
+import {
+  frameContainsElements,
+  getFrameForSide,
+  movePlacementFrameWithDesign,
+  normalizePlacementFrame
+} from './placement'
 
 type BodyPreset = 'STRAIGHT' | 'ATHLETIC' | 'CURVED' | 'FULL'
 
@@ -18,6 +28,13 @@ const presets: Record<BodyPreset, BodyShape> = {
   ATHLETIC: { shoulders: 68, chest: 58, waist: 34, abdomen: 30, yaw: 0 },
   CURVED: { shoulders: 48, chest: 64, waist: 30, abdomen: 48, yaw: 0 },
   FULL: { shoulders: 55, chest: 62, waist: 55, abdomen: 70, yaw: 0 }
+}
+
+const BODY_PRINT_ENVELOPE = {
+  leftPct: 23,
+  topPct: 20,
+  widthPct: 54,
+  heightPct: 56
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -114,21 +131,33 @@ function RenderBodyElement({
 
 export default function BodyPreview3D({
   draft,
-  garmentColor
+  garmentColor,
+  onChange
 }: {
   draft: Draft
   garmentColor: string
+  onChange: (draft: Draft) => void
 }) {
   const [preset, setPreset] = useState<BodyPreset>('STRAIGHT')
   const [shape, setShape] = useState<BodyShape>(presets.STRAIGHT)
-  const [frame, setFrame] = useState({ x: 23, y: 20, width: 54, height: 56 })
+  const [dragPreview, setDragPreview] = useState<PlacementFrameNormalized | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{
     startClientX: number
     startClientY: number
-    startX: number
-    startY: number
+    startFrame: PlacementFrameNormalized
   } | null>(null)
+
+  const product = products.find(item => item.id === draft.productId) ?? products[0]
+  const profile = getPrintProfile(draft.productId, draft.size)
+  const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const canonicalFrame = getFrameForSide(draft, draft.activeSide)
+  const visibleFrame = dragPreview ?? canonicalFrame
+
+  useEffect(() => {
+    setDragPreview(null)
+    dragRef.current = null
+  }, [draft.activeSide, draft.productId, draft.size])
 
   useEffect(() => {
     const move = (event: PointerEvent) => {
@@ -137,18 +166,31 @@ export default function BodyPreview3D({
       if (!drag || !body) return
 
       const rect = body.getBoundingClientRect()
-      const dxPct = ((event.clientX - drag.startClientX) / rect.width) * 100
-      const dyPct = ((event.clientY - drag.startClientY) / rect.height) * 100
+      const dxBodyPct = ((event.clientX - drag.startClientX) / rect.width) * 100
+      const dyBodyPct = ((event.clientY - drag.startClientY) / rect.height) * 100
 
-      setFrame(current => ({
-        ...current,
-        x: clamp(drag.startX + dxPct, 4, 96 - current.width),
-        y: clamp(drag.startY + dyPct, 6, 96 - current.height)
+      const dxNormalized = dxBodyPct / BODY_PRINT_ENVELOPE.widthPct
+      const dyNormalized = dyBodyPct / BODY_PRINT_ENVELOPE.heightPct
+
+      setDragPreview(normalizePlacementFrame({
+        ...drag.startFrame,
+        x: drag.startFrame.x + dxNormalized,
+        y: drag.startFrame.y + dyNormalized
       }))
     }
 
     const up = () => {
+      const preview = dragPreview
+      if (dragRef.current && preview) {
+        onChange(movePlacementFrameWithDesign(
+          draft,
+          draft.activeSide,
+          preview,
+          zone
+        ))
+      }
       dragRef.current = null
+      setDragPreview(null)
     }
 
     window.addEventListener('pointermove', move)
@@ -157,14 +199,12 @@ export default function BodyPreview3D({
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
     }
-  }, [])
+  }, [dragPreview, draft, onChange, zone])
 
   const applyPreset = (next: BodyPreset) => {
     setPreset(next)
     setShape({ ...presets[next], yaw: shape.yaw })
   }
-
-  const product = products.find(item => item.id === draft.productId) ?? products[0]
 
   const garmentReliefStrength = useMemo(() => {
     const typeFactor = product.type === 'TSHIRT' ? 1 : .48
@@ -205,6 +245,35 @@ export default function BodyPreview3D({
   const chestShadow = clamp((shape.chest - 25) / 75, 0, 1) * garmentReliefStrength
   const abdomenShadow = clamp((shape.abdomen - 25) / 75, 0, 1) * garmentReliefStrength
 
+  const frameBodyStyle: CSSProperties = {
+    left: `${BODY_PRINT_ENVELOPE.leftPct + visibleFrame.x * BODY_PRINT_ENVELOPE.widthPct}%`,
+    top: `${BODY_PRINT_ENVELOPE.topPct + visibleFrame.y * BODY_PRINT_ENVELOPE.heightPct}%`,
+    width: `${visibleFrame.width * BODY_PRINT_ENVELOPE.widthPct}%`,
+    height: `${visibleFrame.height * BODY_PRINT_ENVELOPE.heightPct}%`
+  }
+
+  const resizeFrame = (
+    patch: Partial<Pick<PlacementFrameNormalized, 'width' | 'height'>>
+  ) => {
+    const next = normalizePlacementFrame({
+      ...canonicalFrame,
+      ...patch
+    })
+
+    if (!frameContainsElements(next, zone, activeElements)) {
+      alert('Placement frame cannot exclude existing design elements. Move the elements first or enlarge the frame.')
+      return
+    }
+
+    onChange({
+      ...draft,
+      placementFrames: {
+        ...draft.placementFrames,
+        [draft.activeSide]: next
+      }
+    })
+  }
+
   return <div className="body-preview-layout">
     <div className="body-stage">
       <div className="body-perspective">
@@ -228,23 +297,18 @@ export default function BodyPreview3D({
 
           <div
             className="body-relief-frame"
-            style={{
-              left: `${frame.x}%`,
-              top: `${frame.y}%`,
-              width: `${frame.width}%`,
-              height: `${frame.height}%`
-            }}
+            style={frameBodyStyle}
             onPointerDown={event => {
               event.preventDefault()
               dragRef.current = {
                 startClientX: event.clientX,
                 startClientY: event.clientY,
-                startX: frame.x,
-                startY: frame.y
+                startFrame: canonicalFrame
               }
+              setDragPreview(canonicalFrame)
             }}
           >
-            <span className="body-relief-label">BODY RELIEF FRAME</span>
+            <span className="body-relief-label">PLACEMENT</span>
             <i className="relief-line relief-chest">Chest</i>
             <i className="relief-line relief-waist">Waist</i>
             <i className="relief-line relief-abdomen">Abdomen</i>
@@ -253,10 +317,10 @@ export default function BodyPreview3D({
           <div
             className="body-print-surface"
             style={{
-              left: `${frame.x}%`,
-              top: `${frame.y}%`,
-              width: `${frame.width}%`,
-              height: `${frame.height}%`
+              left: `${BODY_PRINT_ENVELOPE.leftPct}%`,
+              top: `${BODY_PRINT_ENVELOPE.topPct}%`,
+              width: `${BODY_PRINT_ENVELOPE.widthPct}%`,
+              height: `${BODY_PRINT_ENVELOPE.heightPct}%`
             }}
           >
             {activeElements.map(element =>
@@ -274,7 +338,7 @@ export default function BodyPreview3D({
       </div>
       <div className="body-floor-shadow"/>
       <div className="body-preview-note">
-        3D-like preview · {product.type === 'HOODIE' ? 'hoodie smooths body relief' : 'tee follows body relief more closely'} · production geometry remains flat/mm-accurate
+        Same Placement Frame as Flat · {product.type === 'HOODIE' ? 'hoodie smooths body relief' : 'tee follows body relief more closely'}
       </div>
     </div>
 
@@ -328,44 +392,60 @@ export default function BodyPreview3D({
       )}
 
       <div className="body-control-section body-frame-controls">
-        <b>Body relief frame</b>
-        <small>Drag the frame directly on the body. It changes body mapping only, not the production print zone.</small>
+        <b>Unified Placement Frame</b>
+        <small>
+          Drag it on the body or resize it here. The same canonical frame is shown in Flat mode.
+        </small>
 
         <label className="body-slider">
-          <span><b>Frame width</b><i>{Math.round(frame.width)}%</i></span>
+          <span><b>Frame width</b><i>{Math.round(canonicalFrame.width * 100)}%</i></span>
           <input
             type="range"
-            min="35"
-            max="72"
-            value={frame.width}
-            onChange={event => setFrame(current => ({
-              ...current,
-              width: Number(event.target.value),
-              x: clamp(current.x, 4, 96 - Number(event.target.value))
-            }))}
+            min="18"
+            max="96"
+            value={Math.round(canonicalFrame.width * 100)}
+            onChange={event => resizeFrame({
+              width: Number(event.target.value) / 100
+            })}
           />
         </label>
 
         <label className="body-slider">
-          <span><b>Frame height</b><i>{Math.round(frame.height)}%</i></span>
+          <span><b>Frame height</b><i>{Math.round(canonicalFrame.height * 100)}%</i></span>
           <input
             type="range"
-            min="38"
-            max="72"
-            value={frame.height}
-            onChange={event => setFrame(current => ({
-              ...current,
-              height: Number(event.target.value),
-              y: clamp(current.y, 6, 96 - Number(event.target.value))
-            }))}
+            min="18"
+            max="96"
+            value={Math.round(canonicalFrame.height * 100)}
+            onChange={event => resizeFrame({
+              height: Number(event.target.value) / 100
+            })}
           />
         </label>
 
         <button
           className="body-reset"
-          onClick={() => setFrame({ x: 23, y: 20, width: 54, height: 56 })}
+          onClick={() => {
+            const next = normalizePlacementFrame({
+              x: .08,
+              y: .08,
+              width: .84,
+              height: .84
+            })
+            if (!frameContainsElements(next, zone, activeElements)) {
+              alert('Default placement frame would exclude current elements. Move or resize the design first.')
+              return
+            }
+            onChange({
+              ...draft,
+              placementFrames: {
+                ...draft.placementFrames,
+                [draft.activeSide]: next
+              }
+            })
+          }}
         >
-          Reset relief frame
+          Reset placement frame
         </button>
       </div>
 
