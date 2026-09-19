@@ -1,15 +1,16 @@
-# PrintMaster Frontend — Mock Alpha
+# PrintMaster Frontend — Interactive Mock Alpha
 
-First live frontend implementation based on the approved UX/spec branch.
+The frontend is now a working mock-first apparel design editor.
 
 ## Stack
 
-- React 19
+- React 19.3
 - TypeScript
 - Vite
 - React Router
 - i18next / react-i18next
-- pure CSS design tokens / responsive layouts
+- Konva 10.5 / react-konva 19.3
+- responsive CSS design system
 
 ## Run
 
@@ -32,46 +33,116 @@ npm run build
 npm run preview
 ```
 
-## Current live flows
+## What is interactive now
+
+### Customer flow
 
 - Home / Create-first
 - Catalog
 - Product detail
-- Responsive mock editor
-- FRONT / BACK
-- Add image/text/sticker mock elements
-- Style bottom sheet
+- Editor
 - Design Check
 - Final Preview
-- Approve → Cart
-- Mock checkout
-- Mock order confirmation
-- RU / KZ / EN language switch
-- localStorage draft persistence
+- Approve
+- Cart
+- Mock Checkout
+- Mock Order
 
-## Routes
+### Design editor
+
+- real Konva canvas;
+- canonical geometry persisted in millimeters;
+- responsive mm → viewport projection;
+- FRONT / BACK;
+- image upload (PNG/JPEG/WebP);
+- add text;
+- edit text;
+- add sticker;
+- drag elements;
+- resize elements;
+- rotate elements;
+- exact width/height/rotation inputs;
+- center action;
+- duplicate;
+- delete;
+- layers;
+- move layer up/down;
+- persistent local draft;
+- RU / KZ / EN UI.
+
+### Design checks
+
+Mock preflight currently checks:
+
+- rotated element bounds against the configured printable area;
+- effective image DPI;
+- BLOCKED / WARNING / READY state;
+- approval disabled when a blocker exists.
+
+### Approval snapshot
+
+Final Preview uses the same canonical draft model.
+
+Approve creates a separate local immutable-style snapshot stored under:
 
 ```
-/
-/products
-/products/:id
-/editor
-/check
-/preview
-/cart
-/checkout
-/order
+pm-approved
 ```
 
-## Important
+Cart reads the approved snapshot rather than the mutable working draft.
 
-This is F1/F2 mock-alpha.
+## Current mock print profiles
 
-The garment editor currently uses a visual SVG mock. It intentionally does **not** implement the canonical Konva/mm geometry engine yet.
+The project contains mock physical garment and printable-area dimensions for:
 
-Next frontend slice:
-1. split App.tsx into feature modules;
-2. introduce Mock API adapters instead of direct fixture access;
-3. add deterministic mock scenarios;
-4. implement F3 canonical mm geometry prototype;
-5. then introduce Konva/direct manipulation.
+- Basic Tee;
+- Basic Hoodie;
+- FRONT;
+- BACK.
+
+These values are placeholders for future measured production profiles.
+
+## Local persistence
+
+The alpha uses browser `localStorage` for draft/snapshot persistence.
+
+Uploaded image previews are stored as data URLs, so this is intentionally temporary.
+
+The backend/object-storage phase must replace this with:
+
+- asset upload/storage;
+- asset IDs;
+- DesignRevision persistence;
+- server-side proof rendering.
+
+## Known alpha limitations
+
+Not implemented yet:
+
+- crop UI;
+- undo/redo command history;
+- snapping guides;
+- element locking;
+- font catalog;
+- arbitrary stickers library;
+- normalized image-upload pipeline;
+- IndexedDB/object storage for large uploads;
+- server-rendered proof;
+- real pricing by print size/sides;
+- real payment/backend.
+
+## Architecture rule
+
+Konva pixels are never the persisted source of truth.
+
+Persisted element fields remain:
+
+```
+xMm
+yMm
+widthMm
+heightMm
+rotationDeg
+```
+
+The viewport only projects those values to pixels.
