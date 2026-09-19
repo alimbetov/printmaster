@@ -11,6 +11,9 @@ Frontend-first product and UX design for the mock-driven MVP.
 5. [Mock Data Contracts](./mock-data-contracts.md)
 6. [Frontend UX Risk Controls](./frontend-ux-risk-controls.md)
 7. [Frontend Design Roadmap](./frontend-design-roadmap.md)
+8. [Deep Frontend Architecture Review](./frontend-architecture-review.md)
+9. [Frontend Coordinate System](./frontend-coordinate-system.md)
+10. [Editor Interaction State Machine](./editor-interaction-state-machine.md)
 
 ## Design principles
 
@@ -18,6 +21,7 @@ Frontend-first product and UX design for the mock-driven MVP.
 - Browser pixels are presentation only.
 - Desktop, tablet and mobile share one product model but use different layout patterns.
 - The editor exposes physical constraints without forcing customers to understand DTF terminology.
-- Server proof is represented as a distinct read-only step even while mocked.
-- Mock APIs simulate future backend contracts and failures.
+- Proof is a distinct read-only artifact rendered independently from the interactive viewport.
+- Mock APIs simulate future backend contracts, concurrency and failure states.
 - Accessibility and touch behavior are part of MVP design, not a later patch.
+- Approved/stale states are explicit; no silent resizing or overwrite is allowed.
