@@ -22,6 +22,8 @@ import {
 } from './mock'
 import i18n from './i18n'
 
+const LOCAL_IMAGE_BUDGET_CHARS = 1_500_000
+
 const normalizeDraft = (draft: Draft): Draft => {
   const next = { ...draft, elements: draft.elements.map(element => ({ ...element })) }
 
@@ -67,7 +69,12 @@ function App() {
       draft: JSON.parse(JSON.stringify(draft)) as Draft
     }
     setApproved(snapshot)
-    localStorage.setItem('pm-approved', JSON.stringify(snapshot))
+    try {
+      localStorage.setItem('pm-approved', JSON.stringify(snapshot))
+    } catch {
+      localStorage.removeItem('pm-approved')
+      alert('The design is approved for this session, but the browser could not persist the image-heavy snapshot. Keep this tab open until checkout.')
+    }
   }
 
   return (
@@ -318,14 +325,25 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     event.target.value = ''
     if (!file || !file.type.startsWith('image/')) return
 
-    if (file.size > 2_000_000) {
-      alert('For this local mock editor use an image smaller than 2 MB.')
+    if (file.size > 900_000) {
+      alert('For this local mock editor use an image smaller than 900 KB. Backend object storage will remove this temporary limit later.')
       return
     }
 
     const reader = new FileReader()
     reader.onload = () => {
       if (typeof reader.result !== 'string') return
+
+      const existingImageChars = draft.elements.reduce(
+        (sum, element) => sum + (element.imageDataUrl?.length ?? 0),
+        0
+      )
+
+      if (existingImageChars + reader.result.length > LOCAL_IMAGE_BUDGET_CHARS) {
+        alert('The local mock editor has reached its temporary image-storage limit. Remove another image or use a smaller file.')
+        return
+      }
+
       const image = new Image()
       image.onload = () => {
         const id = crypto.randomUUID()
