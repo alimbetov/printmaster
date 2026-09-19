@@ -3,6 +3,7 @@ import type {
   DraftStatus,
   MockPrintProfile,
   PreflightIssue,
+  PlacementFrameNormalized,
   Product,
   Side,
   Size
@@ -141,6 +142,23 @@ export const getPrintProfile = (productId: string, size: Size): MockPrintProfile
   }
 }
 
+export const defaultPlacementFrame = (): PlacementFrameNormalized => ({
+  x: .08,
+  y: .08,
+  width: .84,
+  height: .84
+})
+
+export const placementFrameToZoneMm = (
+  frame: PlacementFrameNormalized,
+  zone: MockPrintProfile['front']
+) => ({
+  xMm: zone.xMm + frame.x * zone.widthMm,
+  yMm: zone.yMm + frame.y * zone.heightMm,
+  widthMm: frame.width * zone.widthMm,
+  heightMm: frame.height * zone.heightMm
+})
+
 export const fontCatalog = [
   { id: 'inter', name: 'Inter', family: 'Inter, Arial, sans-serif', category: 'Clean' },
   { id: 'arial', name: 'Arial', family: 'Arial, sans-serif', category: 'Clean' },
@@ -161,6 +179,10 @@ export const createDraft = (productId = 'hoodie-basic', size: Size = 'L'): Draft
   color: product.colors[0].code,
   size,
   activeSide: 'FRONT',
+  placementFrames: {
+    FRONT: defaultPlacementFrame(),
+    BACK: defaultPlacementFrame()
+  },
   status: 'READY',
   elements: [
     {
