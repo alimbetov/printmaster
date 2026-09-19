@@ -272,6 +272,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
   const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
   const [viewMode, setViewMode] = useState<'FLAT' | 'BODY_3D'>('FLAT')
 
   const selected = draft.elements.find(element => element.id === selectedId) ?? null
@@ -531,12 +532,23 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
             onSelect={setSelectedId}
             onChange={commit}
             zoom={zoom}
+            panX={pan.x}
+            panY={pan.y}
           />
           <div className="canvas-zoom">
             <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
-            <button onClick={() => setZoom(1)}>Fit</button>
+            <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Fit</button>
             <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
             <span>{Math.round(zoom * 100)}%</span>
+          </div>
+          <div className="canvas-pan">
+            <button aria-label="Move workspace left" onClick={() => setPan(value => ({ ...value, x: value.x - 40 }))}>←</button>
+            <div>
+              <button aria-label="Move workspace up" onClick={() => setPan(value => ({ ...value, y: value.y - 40 }))}>↑</button>
+              <button aria-label="Center workspace" onClick={() => setPan({ x: 0, y: 0 })}>◎</button>
+              <button aria-label="Move workspace down" onClick={() => setPan(value => ({ ...value, y: value.y + 40 }))}>↓</button>
+            </div>
+            <button aria-label="Move workspace right" onClick={() => setPan(value => ({ ...value, x: value.x + 40 }))}>→</button>
           </div>
           {selected && <div className="measure">
             {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
