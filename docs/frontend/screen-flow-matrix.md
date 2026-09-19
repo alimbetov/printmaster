@@ -4,124 +4,132 @@
 
 | ID | Screen | Purpose | Primary action |
 |---|---|---|---|
-| F01 | Home | Explain value proposition | Start designing |
-| F02 | Catalog | Browse garments | Select product |
-| F03 | Product detail | Choose model/color/size | Customize |
-| F04 | Editor | Build design | Review |
-| F05 | Preflight review | Resolve production issues | Generate proof |
-| F06 | Proof approval | Confirm exact design | Approve |
-| F07 | Cart | Review products/designs | Checkout |
-| F08 | Checkout mock | Delivery/payment simulation | Place order |
-| F09 | Confirmation | Confirm immutable order | Track order |
-| F10 | Order tracking mock | Show lifecycle | View details |
+| F01 | Home/Create entry | Show what can be made | Create yours |
+| F02 | Catalog | Browse garments | Customize |
+| F03 | Product detail | Confirm garment/variant | Customize |
+| F04 | Editor | Create visually | Preview |
+| F05 | Design check | Resolve issues | Continue |
+| F06 | Final preview | Confirm exact result | Approve |
+| F07 | Cart | Review approved items | Checkout |
+| F08 | Checkout mock | Delivery/payment | Place order |
+| F09 | Confirmation | Confirm order | Track |
+| F10 | Tracking mock | Show progress | View details |
+| F11 | Share preview mock | Share design safely | Share / Copy link |
+| F12 | Remix entry | Clone a design | Remix |
 
-## F01 Home
+## F01 Home/Create entry
 
-Must communicate:
-- custom apparel;
-- upload image/add text;
-- choose product;
-- preview before ordering;
-- simple CTA.
+Primary objective:
+make creation understandable in seconds.
 
-Do not overload with production terminology.
+Show:
+- large garment/design examples;
+- Create yours;
+- Upload a pic / Add text / Pick a vibe;
+- optional featured remixes;
+- Browse clothes as secondary path.
+
+Avoid long marketing text.
 
 ## F02 Catalog
 
-Cards:
-- garment image;
-- product name;
-- starting price placeholder;
-- available colors;
-- customizable sides;
-- fit label.
+Visual garment cards:
+- strong imagery;
+- color swatches;
+- fit label;
+- Customize;
+- optional featured design preview.
 
-Filters can be minimal in MVP.
+Keep filtering minimal.
 
 ## F03 Product detail
 
-Must establish product context before editor:
-- image gallery;
+Show:
+- garment gallery;
 - colors;
 - sizes;
-- size guide;
-- material;
+- fit/material;
+- short size guide;
 - printable sides;
-- approximate printable area;
-- care note;
-- Customize CTA.
+- Customize.
 
-Validation:
-- cannot enter editor without valid variant.
+Production details live under Help/How it prints.
 
 ## F04 Editor
 
-Critical persistent context:
-- product name
-- color
-- size
-- active side
-- preflight summary
-- save state
+Persistent:
+- compact product context;
+- FRONT/BACK;
+- save state;
+- Design check state;
+- Preview.
 
-Primary CTA:
-- Review design
+Primary creation actions:
+- Add
+- Style
+- Layers
 
-## F05 Preflight review
+## F05 Design check
 
-Summarize:
-- blockers
-- warnings
-- physical size
-- image quality
-- side usage
+This is a checkpoint, not a second editor.
 
-Block progression if blocker exists.
+Show:
+- Needs a fix first;
+- Worth checking second;
+- physical/quality facts;
+- one-tap return to affected element.
 
-## F06 Proof approval
+If no issues:
+- lightweight “Looks ready” confirmation.
+
+## F06 Final preview
 
 Read-only.
-Show:
-- server/mock proof
-- product/variant
-- FRONT/BACK
-- exact physical print dimensions
-- warnings acknowledged
-- revision id
 
-Approval generates immutable client-side/mock record.
+Show:
+- clean/full garment preview;
+- swipe FRONT/BACK;
+- product/color/size;
+- Design check summary;
+- physical size under details;
+- Edit;
+- Approve design.
+
+The experience should feel like revealing the finished item.
 
 ## F07 Cart
 
-Each item includes:
-- garment thumbnail
-- side thumbnails
-- size/color
-- quantity
-- design revision
-- edit creates new draft; does not mutate approved revision
+Each item:
+- garment thumbnail;
+- FRONT/BACK thumbnails;
+- size/color;
+- quantity;
+- approved revision;
+- Edit as new draft;
+- Remix.
+
+Editing never mutates current approved item.
 
 ## F08 Checkout mock
 
-Keep intentionally simple:
-- contact
-- delivery
-- payment simulator
-- total
+Simple and transparent:
+- contact;
+- delivery;
+- total;
+- payment simulator.
 
-Mock payment modes:
-- success
-- failure
-- timeout
-- duplicate callback simulation for QA mode
+Creation and purchase should remain mentally separate.
+
+If youth/guardian approval is later required by policy/payment rules, handle it here rather than in the creative flow.
 
 ## F09 Confirmation
 
 Show:
-- order id
-- product summary
-- approved proof thumbnails
-- next steps
+- order id;
+- approved design preview;
+- product summary;
+- next steps;
+- optional share-preview action.
 
 ## F10 Tracking mock
 
@@ -133,21 +141,41 @@ Customer language:
 - Packed
 - Shipped
 
-Do not expose internal state-machine jargon unless in dev mode.
+## F11 Share preview
+
+Private by default.
+
+Show:
+- clean social-friendly mockup;
+- share/copy link;
+- privacy control;
+- no original-upload exposure.
+
+## F12 Remix
+
+Can originate from:
+- own saved design;
+- cart item;
+- featured/community design later.
+
+Always creates a new draft.
 
 ## Cross-screen recovery flows
 
 ### Browser refresh in editor
-Reload latest saved draft; restore selection only if safe.
+Restore latest acknowledged draft + recover safe local unsaved work.
 
 ### Back navigation
-Warn only when unsaved canonical changes exist.
+Warn only if canonical unsaved changes would be lost.
 
 ### Product size changed from cart
-Open configurator/editor as new draft and require new proof.
+Create new draft; old approved item remains until replacement approval.
 
-### Proof becomes obsolete
-Clearly mark old proof “Outdated”; cannot approve it.
+### Final preview becomes obsolete
+Mark clearly; approval disabled.
 
 ### Offline during editing
-Allow local continuation if feasible, but block approval/payment until synchronized.
+Allow local continuation where possible; block final approval/payment until synchronized.
+
+### Shared/remix link
+Never grants edit access to original design; creates view or clone semantics only.
