@@ -1,20 +1,64 @@
-import { useMemo, useState } from 'react'
+import { ChangeEvent, useState } from 'react'
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import type { Draft, Locale, Side, Size } from './types'
-import { createDraft, formatKzt, products } from './mock'
+import EditorCanvas from './EditorCanvas'
+import type {
+  ApprovedDesign,
+  DesignElement,
+  Draft,
+  Locale,
+  Side,
+  Size
+} from './types'
+import {
+  createDraft,
+  formatKzt,
+  getDraftStatus,
+  getPreflightIssues,
+  getSidesInUse,
+  printProfiles,
+  products,
+  readStoredJson
+} from './mock'
 import i18n from './i18n'
+
+const normalizeDraft = (draft: Draft): Draft => ({
+  ...draft,
+  elements: draft.elements.map((element, index) => ({
+    ...element,
+    zOrder: element.zOrder ?? index + 1
+  }))
+})
 
 function App() {
   const [draft, setDraft] = useState<Draft>(() => {
-    const raw = localStorage.getItem('pm-draft')
-    return raw ? JSON.parse(raw) : createDraft()
+    const stored = readStoredJson<Draft>('pm-draft')
+    return stored ? normalizeDraft(stored) : createDraft()
   })
-  const [cart, setCart] = useState(false)
+  const [approved, setApproved] = useState<ApprovedDesign | null>(() =>
+    readStoredJson<ApprovedDesign>('pm-approved')
+  )
 
   const updateDraft = (next: Draft) => {
-    setDraft(next)
-    localStorage.setItem('pm-draft', JSON.stringify(next))
+    const normalized = normalizeDraft({
+      ...next,
+      status: getDraftStatus(next)
+    })
+    setDraft(normalized)
+    try {
+      localStorage.setItem('pm-draft', JSON.stringify(normalized))
+    } catch {
+      // Image-heavy drafts may exceed localStorage. Backend/object storage replaces this later.
+    }
+  }
+
+  const approve = () => {
+    const snapshot: ApprovedDesign = {
+      approvedAt: new Date().toISOString(),
+      draft: JSON.parse(JSON.stringify(draft)) as Draft
+    }
+    setApproved(snapshot)
+    localStorage.setItem('pm-approved', JSON.stringify(snapshot))
   }
 
   return (
@@ -23,10 +67,10 @@ function App() {
       <Route path="/products" element={<Catalog />} />
       <Route path="/products/:id" element={<ProductPage draft={draft} onDraft={updateDraft} />} />
       <Route path="/editor" element={<Editor draft={draft} onDraft={updateDraft} />} />
-      <Route path="/check" element={<DesignCheck />} />
-      <Route path="/preview" element={<FinalPreview draft={draft} onApprove={() => setCart(true)} />} />
-      <Route path="/cart" element={<Cart draft={draft} hasItem={cart} />} />
-      <Route path="/checkout" element={<Checkout />} />
+      <Route path="/check" element={<DesignCheck draft={draft} />} />
+      <Route path="/preview" element={<FinalPreview draft={draft} onApprove={approve} />} />
+      <Route path="/cart" element={<Cart approved={approved} />} />
+      <Route path="/checkout" element={<Checkout approved={approved} />} />
       <Route path="/order" element={<OrderDone />} />
     </Routes>
   )
@@ -52,7 +96,13 @@ function LanguageSwitch() {
     i18n.changeLanguage(next)
     document.documentElement.lang = next.split('-')[0]
   }
-  return <select className="locale" value={locale} onChange={e => change(e.target.value as Locale)} aria-label="Language">
+
+  return <select
+    className="locale"
+    value={locale}
+    onChange={event => change(event.target.value as Locale)}
+    aria-label="Language"
+  >
     <option value="ru-KZ">RU</option>
     <option value="kk-KZ">KZ</option>
     <option value="en-US">EN</option>
@@ -61,6 +111,7 @@ function LanguageSwitch() {
 
 function Home() {
   const { t } = useTranslation()
+
   return <><Header/><main>
     <section className="hero">
       <div className="hero-copy">
@@ -74,10 +125,19 @@ function Home() {
       </div>
       <GarmentVisual type="HOODIE" color="#171717" text="ALMATY" />
     </section>
+
     <section className="section">
-      <div className="section-head"><h2>Vibes</h2><span>Start fast, remix later</span></div>
+      <div className="section-head">
+        <h2>{t('vibes')}</h2>
+        <span>{t('vibesHint')}</span>
+      </div>
       <div className="vibes">
-        {['Street','Minimal','Local','Sport'].map((v,i)=><Link to="/editor" className={"vibe vibe-"+i} key={v}><b>{v}</b><span>Tap to remix</span></Link>)}
+        {['Street', 'Minimal', 'Local', 'Sport'].map((vibe, index) =>
+          <Link to="/editor" className={"vibe vibe-" + index} key={vibe}>
+            <b>{vibe}</b>
+            <span>{t('tapToRemix')}</span>
+          </Link>
+        )}
       </div>
     </section>
   </main></>
@@ -85,164 +145,741 @@ function Home() {
 
 function Catalog() {
   const { t } = useTranslation()
+
   return <><Header/><main className="page">
     <div className="page-title"><div><span className="eyebrow">SHOP</span><h1>{t('shop')}</h1></div></div>
-    <div className="product-grid">{products.map(p=><article className="product-card" key={p.id}>
-      <GarmentVisual type={p.type} color="#171717" text={p.type==='HOODIE'?'MAKE IT':'YOUR ART'} compact/>
-      <h3>{p.name}</h3><p>{p.description}</p>
-      <div className="card-row"><b>{formatKzt(p.price, i18n.language)}</b><Link className="btn small primary" to={"/products/"+p.id}>{t('customize')}</Link></div>
-    </article>)}</div>
-  </main></>
-}
-
-function ProductPage({draft,onDraft}:{draft:Draft,onDraft:(d:Draft)=>void}) {
-  const { id } = useParams()
-  const nav = useNavigate()
-  const { t } = useTranslation()
-  const product = products.find(p=>p.id===id) || products[0]
-  const [color,setColor] = useState(draft.productId===product.id?draft.color:'black')
-  const [size,setSize] = useState<Size>(draft.productId===product.id?draft.size:'L')
-  const chosen = product.colors.find(c=>c.code===color) || product.colors[0]
-  const go = () => {
-    onDraft({...createDraft(product.id),color,size})
-    nav('/editor')
-  }
-  return <><Header/><main className="product-page">
-    <div className="product-stage"><GarmentVisual type={product.type} color={chosen.hex} text="YOUR ART"/></div>
-    <div className="product-info">
-      <span className="eyebrow">{product.type}</span><h1>{product.name}</h1><p>{product.description}</p>
-      <h4>{t('color')}</h4><div className="chips">{product.colors.map(c=><button key={c.code} className={"chip "+(color===c.code?'selected':'')} onClick={()=>setColor(c.code)}><i style={{background:c.hex}}/>{c.name}</button>)}</div>
-      <h4>{t('size')}</h4><div className="chips">{product.sizes.map(s=><button key={s} className={"chip "+(size===s?'selected':'')} onClick={()=>setSize(s)}>{s}</button>)}</div>
-      <div className="price">{formatKzt(product.price,i18n.language)}</div>
-      <button className="btn primary full" onClick={go}>{t('customize')}</button>
+    <div className="product-grid">
+      {products.map(product =>
+        <article className="product-card" key={product.id}>
+          <GarmentVisual
+            type={product.type}
+            color="#171717"
+            text={product.type === 'HOODIE' ? 'MAKE IT' : 'YOUR ART'}
+            compact
+          />
+          <h3>{product.name}</h3>
+          <p>{t(product.descriptionKey)}</p>
+          <div className="card-row">
+            <b>{formatKzt(product.price, i18n.language)}</b>
+            <Link className="btn small primary" to={"/products/" + product.id}>
+              {t('customize')}
+            </Link>
+          </div>
+        </article>
+      )}
     </div>
   </main></>
 }
 
-function Editor({draft,onDraft}:{draft:Draft,onDraft:(d:Draft)=>void}) {
+function ProductPage({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => void }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
   const { t } = useTranslation()
-  const nav = useNavigate()
-  const product = products.find(p=>p.id===draft.productId) || products[1]
-  const color = product.colors.find(c=>c.code===draft.color)?.hex || '#171717'
-  const [sheet,setSheet] = useState<'ADD'|'STYLE'|null>(null)
-  const active = draft.elements.filter(e=>e.side===draft.activeSide)
-  const label = active[0]?.label || 'YOUR ART'
-  const setSide=(side:Side)=>onDraft({...draft,activeSide:side})
-  const add=(type:'TEXT'|'IMAGE'|'STICKER')=>{
-    const label=type==='TEXT'?'ALMATY':type==='IMAGE'?'PHOTO':'★'
-    onDraft({...draft,elements:[...draft.elements,{id:crypto.randomUUID(),type,label,side:draft.activeSide,xMm:125,yMm:205,widthMm:150,heightMm:50,rotationDeg:0}]})
-    setSheet(null)
+  const product = products.find(item => item.id === id) ?? products[0]
+  const [color, setColor] = useState(draft.productId === product.id ? draft.color : 'black')
+  const [size, setSize] = useState<Size>(draft.productId === product.id ? draft.size : 'L')
+  const chosen = product.colors.find(item => item.code === color) ?? product.colors[0]
+
+  const customize = () => {
+    onDraft({ ...createDraft(product.id), color, size })
+    navigate('/editor')
   }
+
+  return <><Header/><main className="product-page">
+    <div className="product-stage">
+      <GarmentVisual type={product.type} color={chosen.hex} text="YOUR ART"/>
+    </div>
+    <div className="product-info">
+      <span className="eyebrow">{product.type}</span>
+      <h1>{product.name}</h1>
+      <p>{t(product.descriptionKey)}</p>
+
+      <h4>{t('color')}</h4>
+      <div className="chips">
+        {product.colors.map(item =>
+          <button
+            key={item.code}
+            className={"chip " + (color === item.code ? 'selected' : '')}
+            onClick={() => setColor(item.code)}
+          >
+            <i style={{ background: item.hex }}/>
+            {item.name}
+          </button>
+        )}
+      </div>
+
+      <h4>{t('size')}</h4>
+      <div className="chips">
+        {product.sizes.map(item =>
+          <button
+            key={item}
+            className={"chip " + (size === item ? 'selected' : '')}
+            onClick={() => setSize(item)}
+          >
+            {item}
+          </button>
+        )}
+      </div>
+
+      <div className="price">{formatKzt(product.price, i18n.language)}</div>
+      <button className="btn primary full" onClick={customize}>{t('customize')}</button>
+    </div>
+  </main></>
+}
+
+function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => void }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const product = products.find(item => item.id === draft.productId) ?? products[1]
+  const garmentColor = product.colors.find(item => item.code === draft.color)?.hex ?? '#171717'
+  const profile = printProfiles[draft.productId]
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
+
+  const selected = draft.elements.find(element => element.id === selectedId) ?? null
+  const activeElements = draft.elements
+    .filter(element => element.side === draft.activeSide)
+    .sort((a, b) => a.zOrder - b.zOrder)
+  const status = getDraftStatus(draft)
+  const issues = getPreflightIssues(draft)
+
+  const commit = (next: Draft) => onDraft({
+    ...next,
+    status: getDraftStatus(next)
+  })
+
+  const updateElement = (id: string, patch: Partial<DesignElement>) => {
+    commit({
+      ...draft,
+      elements: draft.elements.map(element =>
+        element.id === id ? { ...element, ...patch } : element
+      )
+    })
+  }
+
+  const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const maxZ = Math.max(0, ...draft.elements.map(element => element.zOrder))
+
+  const addText = () => {
+    const id = crypto.randomUUID()
+    commit({
+      ...draft,
+      elements: [...draft.elements, {
+        id,
+        type: 'TEXT',
+        label: 'YOUR TEXT',
+        side: draft.activeSide,
+        xMm: zone.xMm + zone.widthMm / 2,
+        yMm: zone.yMm + zone.heightMm / 2,
+        widthMm: Math.min(150, zone.widthMm * .72),
+        heightMm: 42,
+        rotationDeg: 0,
+        zOrder: maxZ + 1,
+        fill: garmentColor === '#f4f4f2' ? '#111214' : '#ffffff'
+      }]
+    })
+    setSelectedId(id)
+    setSheet('STYLE')
+  }
+
+  const addSticker = () => {
+    const id = crypto.randomUUID()
+    commit({
+      ...draft,
+      elements: [...draft.elements, {
+        id,
+        type: 'STICKER',
+        label: '★',
+        side: draft.activeSide,
+        xMm: zone.xMm + zone.widthMm / 2,
+        yMm: zone.yMm + zone.heightMm / 2,
+        widthMm: 70,
+        heightMm: 70,
+        rotationDeg: 0,
+        zOrder: maxZ + 1,
+        fill: '#8c78ff'
+      }]
+    })
+    setSelectedId(id)
+    setSheet('STYLE')
+  }
+
+  const uploadImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !file.type.startsWith('image/')) return
+
+    if (file.size > 2_000_000) {
+      alert('For this local mock editor use an image smaller than 2 MB.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return
+      const image = new Image()
+      image.onload = () => {
+        const id = crypto.randomUUID()
+        const aspect = image.naturalWidth / Math.max(image.naturalHeight, 1)
+        const widthMm = Math.min(150, zone.widthMm * .7)
+        const heightMm = Math.min(widthMm / Math.max(aspect, .2), zone.heightMm * .7)
+
+        commit({
+          ...draft,
+          elements: [...draft.elements, {
+            id,
+            type: 'IMAGE',
+            label: file.name,
+            side: draft.activeSide,
+            xMm: zone.xMm + zone.widthMm / 2,
+            yMm: zone.yMm + zone.heightMm / 2,
+            widthMm,
+            heightMm,
+            rotationDeg: 0,
+            zOrder: maxZ + 1,
+            imageDataUrl: reader.result,
+            sourceWidthPx: image.naturalWidth,
+            sourceHeightPx: image.naturalHeight
+          }]
+        })
+        setSelectedId(id)
+        setSheet('STYLE')
+      }
+      image.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeSelected = () => {
+    if (!selected) return
+    commit({
+      ...draft,
+      elements: draft.elements.filter(element => element.id !== selected.id)
+    })
+    setSelectedId(null)
+  }
+
+  const duplicateSelected = () => {
+    if (!selected) return
+    const id = crypto.randomUUID()
+    commit({
+      ...draft,
+      elements: [...draft.elements, {
+        ...selected,
+        id,
+        xMm: selected.xMm + 10,
+        yMm: selected.yMm + 10,
+        zOrder: maxZ + 1
+      }]
+    })
+    setSelectedId(id)
+  }
+
+  const centerSelected = () => {
+    if (!selected) return
+    updateElement(selected.id, {
+      xMm: zone.xMm + zone.widthMm / 2,
+      yMm: zone.yMm + zone.heightMm / 2
+    })
+  }
+
+  const moveLayer = (direction: 1 | -1) => {
+    if (!selected) return
+    updateElement(selected.id, { zOrder: selected.zOrder + direction })
+  }
+
+  const setSide = (side: Side) => {
+    setSelectedId(null)
+    commit({ ...draft, activeSide: side })
+  }
+
+  const goPreview = () => {
+    navigate(status === 'BLOCKED' ? '/check' : '/preview')
+  }
+
   return <div className="editor-shell">
     <div className="editor-top">
       <Link className="brand" to="/">PRINTMASTER</Link>
-      <button className="variant-pill" onClick={()=>nav('/products/'+product.id)}>{product.name} · {draft.size}</button>
-      <div className="side-switch"><button className={draft.activeSide==='FRONT'?'active':''} onClick={()=>setSide('FRONT')}>{t('front')}</button><button className={draft.activeSide==='BACK'?'active':''} onClick={()=>setSide('BACK')}>{t('back')}</button></div>
-      <button className="status ready" onClick={()=>nav('/check')}>✓ {t('looksReady')}</button>
-      <button className="btn primary small" onClick={()=>nav('/preview')}>{t('preview')}</button>
+      <button className="variant-pill" onClick={() => navigate('/products/' + product.id)}>
+        {product.name} · {draft.size}
+      </button>
+      <div className="side-switch">
+        <button className={draft.activeSide === 'FRONT' ? 'active' : ''} onClick={() => setSide('FRONT')}>
+          {t('front')}
+        </button>
+        <button className={draft.activeSide === 'BACK' ? 'active' : ''} onClick={() => setSide('BACK')}>
+          {t('back')}
+        </button>
+      </div>
+      <StatusButton status={status} onClick={() => navigate('/check')} />
+      <button className="btn primary small" onClick={goPreview}>{t('preview')}</button>
       <LanguageSwitch/>
     </div>
+
     <div className="editor-main">
       <aside className="desktop-rail">
-        <button onClick={()=>setSheet('ADD')}>＋<span>{t('add')}</span></button>
-        <button onClick={()=>setSheet('STYLE')}>◐<span>{t('style')}</span></button>
-        <button>▱<span>{t('layers')}</span></button>
+        <button onClick={() => setSheet('ADD')}>＋<span>{t('add')}</span></button>
+        <button onClick={() => setSheet('STYLE')}>◐<span>{t('style')}</span></button>
+        <button onClick={() => setSheet('LAYERS')}>▱<span>{t('layers')}</span></button>
       </aside>
+
       <section className="canvas-area">
-        <GarmentVisual type={product.type} color={color} text={label} side={draft.activeSide}/>
-        {active.length>0 && <div className="measure">24.7 × 29.3 cm</div>}
+        <EditorCanvas
+          draft={draft}
+          garmentColor={garmentColor}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onChange={commit}
+        />
+        {selected && <div className="measure">
+          {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
+        </div>}
       </section>
+
       <aside className="context-panel">
-        <span className="eyebrow">ESTIMATE</span><h3>{formatKzt(product.price,i18n.language)}</h3>
-        <div className="mini-card"><b>{t('designCheck')}</b><span>✓ {t('looksReady')}</span></div>
-        <div className="mini-card"><b>{t('layers')}</b><span>{active.length} element(s)</span></div>
+        <span className="eyebrow">{t('estimate')}</span>
+        <h3>{formatKzt(product.price, i18n.language)}</h3>
+
+        <div className="mini-card">
+          <b>{t('designCheck')}</b>
+          <StatusInline status={status} />
+          {issues.length > 0 && <small>{issues.length} issue(s)</small>}
+        </div>
+
+        <EditorInspector
+          selected={selected}
+          zoneCenter={{
+            xMm: zone.xMm + zone.widthMm / 2,
+            yMm: zone.yMm + zone.heightMm / 2
+          }}
+          onUpdate={patch => selected && updateElement(selected.id, patch)}
+          onDelete={removeSelected}
+          onDuplicate={duplicateSelected}
+          onCenter={centerSelected}
+          onLayerUp={() => moveLayer(1)}
+          onLayerDown={() => moveLayer(-1)}
+        />
+
+        <LayerList
+          elements={activeElements}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+        />
       </aside>
     </div>
+
     <div className="mobile-dock">
-      <button onClick={()=>setSheet('ADD')}>＋<span>{t('add')}</span></button>
-      <button onClick={()=>setSheet('STYLE')}>◐<span>{t('style')}</span></button>
-      <button onClick={()=>nav('/preview')}>◫<span>{t('preview')}</span></button>
+      <button onClick={() => setSheet('ADD')}>＋<span>{t('add')}</span></button>
+      <button onClick={() => setSheet('STYLE')}>◐<span>{t('style')}</span></button>
+      <button onClick={goPreview}>◫<span>{t('preview')}</span></button>
     </div>
-    {sheet && <div className="sheet-backdrop" onClick={()=>setSheet(null)}><div className="bottom-sheet" onClick={e=>e.stopPropagation()}>
-      <div className="sheet-handle"/><div className="sheet-head"><h3>{sheet==='ADD'?t('add'):t('style')}</h3><button onClick={()=>setSheet(null)}>✕</button></div>
-      {sheet==='ADD'?<div className="sheet-grid">
-        <button onClick={()=>add('IMAGE')}>▧<b>Image</b></button>
-        <button onClick={()=>add('TEXT')}>T<b>{t('text')}</b></button>
-        <button onClick={()=>add('STICKER')}>★<b>{t('sticker')}</b></button>
-        <button>▦<b>{t('layout')}</b></button>
-      </div>:<div className="style-list">
-        {['Clean','Street','Bold','Minimal'].map(s=><button key={s} onClick={()=>setSheet(null)}>{s}</button>)}
-      </div>}
-    </div></div>}
+
+    {sheet && <div className="sheet-backdrop" onClick={() => setSheet(null)}>
+      <div className="bottom-sheet" onClick={event => event.stopPropagation()}>
+        <div className="sheet-handle"/>
+        <div className="sheet-head">
+          <h3>{sheet === 'ADD' ? t('add') : sheet === 'LAYERS' ? t('layers') : t('style')}</h3>
+          <button onClick={() => setSheet(null)}>✕</button>
+        </div>
+
+        {sheet === 'ADD' && <div className="sheet-grid">
+          <label className="sheet-action">
+            ▧<b>{t('image')}</b>
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadImage} hidden/>
+          </label>
+          <button onClick={addText}>T<b>{t('text')}</b></button>
+          <button onClick={addSticker}>★<b>{t('sticker')}</b></button>
+          <button onClick={() => setSheet('LAYERS')}>▱<b>{t('layers')}</b></button>
+        </div>}
+
+        {sheet === 'STYLE' && <>
+          <EditorInspector
+            selected={selected}
+            zoneCenter={{
+              xMm: zone.xMm + zone.widthMm / 2,
+              yMm: zone.yMm + zone.heightMm / 2
+            }}
+            onUpdate={patch => selected && updateElement(selected.id, patch)}
+            onDelete={removeSelected}
+            onDuplicate={duplicateSelected}
+            onCenter={centerSelected}
+            onLayerUp={() => moveLayer(1)}
+            onLayerDown={() => moveLayer(-1)}
+          />
+          <button className="btn secondary full" onClick={() => setSheet('LAYERS')}>
+            {t('layers')}
+          </button>
+        </>}
+
+        {sheet === 'LAYERS' && <LayerList
+          elements={activeElements}
+          selectedId={selectedId}
+          onSelect={id => {
+            setSelectedId(id)
+            setSheet('STYLE')
+          }}
+        />}
+      </div>
+    </div>}
   </div>
 }
 
-function DesignCheck() {
+function EditorInspector({
+  selected,
+  zoneCenter,
+  onUpdate,
+  onDelete,
+  onDuplicate,
+  onCenter,
+  onLayerUp,
+  onLayerDown
+}: {
+  selected: DesignElement | null
+  zoneCenter: { xMm: number, yMm: number }
+  onUpdate: (patch: Partial<DesignElement>) => void
+  onDelete: () => void
+  onDuplicate: () => void
+  onCenter: () => void
+  onLayerUp: () => void
+  onLayerDown: () => void
+}) {
   const { t } = useTranslation()
+
+  if (!selected) {
+    return <div className="mini-card inspector-empty">
+      <b>{t('style')}</b>
+      <span>Select an element on the garment.</span>
+    </div>
+  }
+
+  return <div className="inspector">
+    <div className="inspector-head">
+      <b>{selected.type}</b>
+      <span>{(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm</span>
+    </div>
+
+    {selected.type === 'TEXT' && <label>
+      {t('text')}
+      <input
+        value={selected.label}
+        onChange={event => onUpdate({ label: event.target.value })}
+      />
+    </label>}
+
+    {(selected.type === 'TEXT' || selected.type === 'STICKER') && <label>
+      {t('color')}
+      <input
+        type="color"
+        value={selected.fill ?? '#ffffff'}
+        onChange={event => onUpdate({ fill: event.target.value })}
+      />
+    </label>}
+
+    <div className="number-grid">
+      <label>W cm<input
+        type="number"
+        min="1"
+        step=".1"
+        value={(selected.widthMm / 10).toFixed(1)}
+        onChange={event => onUpdate({ widthMm: Math.max(10, Number(event.target.value) * 10) })}
+      /></label>
+      <label>H cm<input
+        type="number"
+        min="1"
+        step=".1"
+        value={(selected.heightMm / 10).toFixed(1)}
+        onChange={event => onUpdate({ heightMm: Math.max(10, Number(event.target.value) * 10) })}
+      /></label>
+      <label>°<input
+        type="number"
+        step="1"
+        value={selected.rotationDeg}
+        onChange={event => onUpdate({ rotationDeg: Number(event.target.value) })}
+      /></label>
+    </div>
+
+    <div className="inspector-actions">
+      <button onClick={onCenter}>◎ Center</button>
+      <button onClick={onDuplicate}>⧉ Duplicate</button>
+      <button onClick={onLayerUp}>↑ Layer</button>
+      <button onClick={onLayerDown}>↓ Layer</button>
+      <button className="danger-action" onClick={onDelete}>Delete</button>
+    </div>
+    <small className="muted">Center: {zoneCenter.xMm.toFixed(0)} / {zoneCenter.yMm.toFixed(0)} mm</small>
+  </div>
+}
+
+function LayerList({
+  elements,
+  selectedId,
+  onSelect
+}: {
+  elements: DesignElement[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+}) {
+  const { t } = useTranslation()
+
+  return <div className="layer-list">
+    <b>{t('layers')}</b>
+    {elements.length === 0 && <span className="muted">{t('emptySide')}</span>}
+    {[...elements].reverse().map(element =>
+      <button
+        key={element.id}
+        className={selectedId === element.id ? 'active' : ''}
+        onClick={() => onSelect(element.id)}
+      >
+        <span>{element.type === 'IMAGE' ? '▧' : element.type === 'TEXT' ? 'T' : '★'}</span>
+        <b>{element.label || element.type}</b>
+      </button>
+    )}
+  </div>
+}
+
+function StatusButton({ status, onClick }: { status: Draft['status'], onClick: () => void }) {
+  const { t } = useTranslation()
+  const config = status === 'BLOCKED'
+    ? { cls: 'blocked', icon: '✕', text: t('needsFix') }
+    : status === 'WARNING'
+      ? { cls: 'warning', icon: '⚠', text: t('worthChecking') }
+      : status === 'DRAFT'
+        ? { cls: 'draft', icon: '＋', text: t('draftStatus') }
+        : { cls: 'ready', icon: '✓', text: t('looksReady') }
+
+  return <button className={"status " + config.cls} onClick={onClick}>
+    {config.icon} {config.text}
+  </button>
+}
+
+function StatusInline({ status }: { status: Draft['status'] }) {
+  const { t } = useTranslation()
+  if (status === 'BLOCKED') return <span>✕ {t('needsFix')}</span>
+  if (status === 'WARNING') return <span>⚠ {t('worthChecking')}</span>
+  if (status === 'DRAFT') return <span>＋ {t('draftStatus')}</span>
+  return <span>✓ {t('looksReady')}</span>
+}
+
+function DesignCheck({ draft }: { draft: Draft }) {
+  const { t } = useTranslation()
+  const issues = getPreflightIssues(draft)
+  const status = getDraftStatus(draft)
+
   return <div className="simple-screen"><Header/><main className="narrow">
-    <span className="status warning">⚠ {t('worthChecking')}</span><h1>{t('designCheck')}</h1>
-    <div className="check-card warning-card"><b>Image may print blurry at this size</b><p>Reduce it slightly for a sharper result.</p><Link to="/editor">{t('edit')}</Link></div>
-    <div className="check-card good">✓ Placement looks good</div><div className="check-card good">✓ Inside printable area</div>
-    <Link className="btn primary full" to="/preview">{t('continue')}</Link>
+    <StatusButton status={status} onClick={() => {}} />
+    <h1>{t('designCheck')}</h1>
+
+    {issues.length === 0 && <div className="check-card good">
+      <b>✓ {t('allChecksGood')}</b>
+      <p>{t('allChecksGoodHint')}</p>
+    </div>}
+
+    {issues.map(issue =>
+      <div
+        key={issue.code + issue.elementId}
+        className={"check-card " + (issue.severity === 'BLOCKER' ? 'danger-card' : 'warning-card')}
+      >
+        <b>{issue.code === 'LOW_DPI' ? t('warningImageTitle') : t('needsFix')}</b>
+        <p>
+          {issue.code === 'LOW_DPI'
+            ? `${t('warningImageHint')} ${issue.value ?? ''} DPI`
+            : 'Part of the selected element is outside the printable area.'}
+        </p>
+        <Link to="/editor">{t('edit')}</Link>
+      </div>
+    )}
+
+    <div className="check-card good">✓ {t('placementGood')}</div>
+    <div className="check-card good">✓ {t('insideArea')}</div>
+
+    {status !== 'BLOCKED'
+      ? <Link className="btn primary full" to="/preview">{t('continue')}</Link>
+      : <Link className="btn secondary full" to="/editor">{t('edit')}</Link>}
   </main></div>
 }
 
-function FinalPreview({draft,onApprove}:{draft:Draft,onApprove:()=>void}) {
+function FinalPreview({ draft, onApprove }: { draft: Draft, onApprove: () => void }) {
   const { t } = useTranslation()
-  const nav=useNavigate()
-  const product=products.find(p=>p.id===draft.productId) || products[1]
-  const color=product.colors.find(c=>c.code===draft.color)?.hex || '#171717'
-  const label=draft.elements.find(e=>e.side===draft.activeSide)?.label || 'YOUR ART'
-  const approve=()=>{onApprove();nav('/cart')}
+  const navigate = useNavigate()
+  const product = products.find(item => item.id === draft.productId) ?? products[1]
+  const garmentColor = product.colors.find(item => item.code === draft.color)?.hex ?? '#171717'
+  const sides = getSidesInUse(draft)
+  const [side, setSide] = useState<Side>(sides[0] ?? 'FRONT')
+  const status = getDraftStatus(draft)
+
+  const previewDraft = { ...draft, activeSide: side }
+
   return <div className="preview-page"><Header/><main className="preview-layout">
-    <div className="preview-stage"><GarmentVisual type={product.type} color={color} text={label}/></div>
+    <div className="preview-stage">
+      <EditorCanvas
+        draft={previewDraft}
+        garmentColor={garmentColor}
+        selectedId={null}
+        onSelect={() => {}}
+        onChange={() => {}}
+        readOnly
+      />
+    </div>
+
     <aside className="approval">
-      <span className="eyebrow">{t('finalPreview')}</span><h1>{product.name}</h1><p>{draft.color} · {draft.size}</p>
-      <span className="status ready">✓ {t('looksReady')}</span>
-      <p className="muted">24.7 × 29.3 cm</p>
-      <p className="note">Digital design checks passed. Garment preview is approximate.</p>
-      <div className="actions column"><Link className="btn secondary full" to="/editor">{t('edit')}</Link><button className="btn primary full" onClick={approve}>{t('approve')}</button></div>
+      <span className="eyebrow">{t('finalPreview')}</span>
+      <h1>{product.name}</h1>
+      <p>{draft.color} · {draft.size}</p>
+
+      <div className="preview-side-switch">
+        {(['FRONT', 'BACK'] as Side[]).map(item =>
+          <button
+            key={item}
+            className={side === item ? 'active' : ''}
+            onClick={() => setSide(item)}
+          >
+            {item === 'FRONT' ? t('front') : t('back')}
+            {draft.elements.some(element => element.side === item) ? ' •' : ''}
+          </button>
+        )}
+      </div>
+
+      <StatusInline status={status} />
+      <p className="muted">{t('printSize')}: 25 × 30 cm max</p>
+      <p className="note">{t('previewApprox')}</p>
+
+      <div className="actions column">
+        <Link className="btn secondary full" to="/editor">{t('edit')}</Link>
+        <button
+          className="btn primary full"
+          disabled={status === 'BLOCKED'}
+          onClick={() => {
+            onApprove()
+            navigate('/cart')
+          }}
+        >
+          {t('approve')}
+        </button>
+      </div>
     </aside>
   </main></div>
 }
 
-function Cart({draft,hasItem}:{draft:Draft,hasItem:boolean}) {
-  const {t}=useTranslation()
-  const product=products.find(p=>p.id===draft.productId) || products[1]
+function Cart({ approved }: { approved: ApprovedDesign | null }) {
+  const { t } = useTranslation()
+
+  if (!approved) {
+    return <><Header/><main className="narrow">
+      <h1>{t('cart')}</h1>
+      <div className="empty">
+        <p>{t('noApprovedDesign')}</p>
+        <Link className="btn primary" to="/editor">{t('create')}</Link>
+      </div>
+    </main></>
+  }
+
+  const draft = approved.draft
+  const product = products.find(item => item.id === draft.productId) ?? products[1]
+  const garmentColor = product.colors.find(item => item.code === draft.color)?.hex ?? '#171717'
+  const sides = getSidesInUse(draft)
+
   return <><Header/><main className="narrow">
     <h1>{t('cart')}</h1>
-    {!hasItem?<div className="empty"><p>No approved design yet.</p><Link className="btn primary" to="/editor">{t('create')}</Link></div>:<>
-      <div className="cart-item"><GarmentVisual type={product.type} color="#171717" text="ALMATY" compact/><div><h3>{product.name}</h3><p>{draft.color} · {draft.size}</p><p>{t('front')} + {t('back')}</p><div className="actions"><Link to="/editor">{t('edit')}</Link><button className="link-btn">{t('remix')}</button></div></div></div>
-      <div className="total"><span>Total</span><b>{formatKzt(product.price,i18n.language)}</b></div><Link className="btn primary full" to="/checkout">{t('checkout')}</Link>
-    </>}
+    <div className="cart-item cart-item-live">
+      <div className="cart-preview">
+        <EditorCanvas
+          draft={{ ...draft, activeSide: sides[0] ?? 'FRONT' }}
+          garmentColor={garmentColor}
+          selectedId={null}
+          onSelect={() => {}}
+          onChange={() => {}}
+          readOnly
+        />
+      </div>
+      <div>
+        <h3>{product.name}</h3>
+        <p>{draft.color} · {draft.size}</p>
+        <p>{t('usedSides')}: {sides.map(side => side === 'FRONT' ? t('front') : t('back')).join(' + ')}</p>
+        <div className="actions">
+          <Link to="/editor">{t('edit')}</Link>
+          <button className="link-btn">{t('remix')}</button>
+        </div>
+      </div>
+    </div>
+
+    <div className="total">
+      <span>{t('total')}</span>
+      <b>{formatKzt(product.price, i18n.language)}</b>
+    </div>
+    <Link className="btn primary full" to="/checkout">{t('checkout')}</Link>
   </main></>
 }
 
-function Checkout() {
-  const {t}=useTranslation(); const nav=useNavigate()
-  return <><Header/><main className="narrow"><h1>{t('checkout')}</h1>
-    <div className="form-grid"><label>Name<input defaultValue="Ruslan"/></label><label>Phone<input placeholder="+7 7__ ___ __ __"/></label><label className="wide">Delivery address<input placeholder="Almaty"/></label></div>
-    <div className="check-card"><b>Mock payment</b><p>No real payment will be charged.</p></div>
-    <button className="btn primary full" onClick={()=>nav('/order')}>Place mock order</button>
+function Checkout({ approved }: { approved: ApprovedDesign | null }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+
+  if (!approved) {
+    return <><Header/><main className="narrow">
+      <h1>{t('checkout')}</h1>
+      <p>{t('noApprovedDesign')}</p>
+      <Link className="btn primary" to="/editor">{t('create')}</Link>
+    </main></>
+  }
+
+  return <><Header/><main className="narrow">
+    <h1>{t('checkout')}</h1>
+    <div className="form-grid">
+      <label>{t('name')}<input autoComplete="name"/></label>
+      <label>{t('phone')}<input type="tel" placeholder="+7 7__ ___ __ __"/></label>
+      <label className="wide">{t('deliveryAddress')}<input placeholder="Almaty"/></label>
+    </div>
+    <div className="check-card">
+      <b>{t('mockPayment')}</b>
+      <p>{t('mockPaymentHint')}</p>
+    </div>
+    <button className="btn primary full" onClick={() => navigate('/order')}>
+      {t('placeMockOrder')}
+    </button>
   </main></>
 }
 
 function OrderDone() {
-  return <><Header/><main className="narrow success-screen"><div className="big-check">✓</div><h1>Order PM-0001 created</h1><p>This is a mock order. Next step: production workflow mock.</p><Link className="btn primary" to="/">Back home</Link></main></>
+  const { t } = useTranslation()
+  return <><Header/><main className="narrow success-screen">
+    <div className="big-check">✓</div>
+    <h1>{t('orderCreated')}</h1>
+    <p>{t('orderCreatedHint')}</p>
+    <Link className="btn primary" to="/">{t('backHome')}</Link>
+  </main></>
 }
 
-function GarmentVisual({type,color,text,compact=false,side='FRONT'}:{type:'TSHIRT'|'HOODIE',color:string,text:string,compact?:boolean,side?:Side}) {
-  return <div className={"garment-wrap "+(compact?'compact':'')}>
+function GarmentVisual({
+  type,
+  color,
+  text,
+  compact = false
+}: {
+  type: 'TSHIRT' | 'HOODIE'
+  color: string
+  text: string
+  compact?: boolean
+}) {
+  return <div className={"garment-wrap " + (compact ? 'compact' : '')}>
     <svg className="garment" viewBox="0 0 420 500" role="img" aria-label={type}>
-      {type==='HOODIE'?<>
+      {type === 'HOODIE' ? <>
         <path d="M145 85 Q210 20 275 85 L330 120 390 210 330 245 312 190 315 455 105 455 108 190 90 245 30 210 90 120Z" fill={color}/>
         <path d="M155 85 Q210 130 265 85 Q260 40 210 25 Q160 40 155 85Z" fill={color} stroke="#303136" strokeWidth="4"/>
         <path d="M145 340 Q210 315 275 340 L270 415 150 415Z" fill="none" stroke="#505158" strokeWidth="4"/>
-      </>:<>
+      </> : <>
         <path d="M135 80 L85 105 25 180 75 220 105 180 105 455 315 455 315 180 345 220 395 180 335 105 285 80 Q210 125 135 80Z" fill={color}/>
       </>}
       <rect x="130" y="150" width="160" height="190" rx="8" fill="none" stroke="#8c78ff" strokeDasharray="8 7" strokeWidth="3" opacity=".7"/>
-      <text x="210" y="245" textAnchor="middle" fill={color==='#f4f4f2'?'#111214':'white'} fontSize="34" fontWeight="800" fontFamily="Arial, sans-serif">{side==='BACK'?'BACK':' '}{text}</text>
+      <text
+        x="210"
+        y="245"
+        textAnchor="middle"
+        fill={color === '#f4f4f2' ? '#111214' : 'white'}
+        fontSize="34"
+        fontWeight="800"
+        fontFamily="Arial, sans-serif"
+      >
+        {text}
+      </text>
     </svg>
   </div>
 }
