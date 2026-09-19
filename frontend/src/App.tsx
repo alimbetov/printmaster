@@ -22,13 +22,21 @@ import {
 } from './mock'
 import i18n from './i18n'
 
-const normalizeDraft = (draft: Draft): Draft => ({
-  ...draft,
-  elements: draft.elements.map((element, index) => ({
-    ...element,
-    zOrder: element.zOrder ?? index + 1
-  }))
-})
+const normalizeDraft = (draft: Draft): Draft => {
+  const next = { ...draft, elements: draft.elements.map(element => ({ ...element })) }
+
+  for (const side of ['FRONT', 'BACK'] as Side[]) {
+    const ordered = next.elements
+      .filter(element => element.side === side)
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0))
+
+    ordered.forEach((element, index) => {
+      element.zOrder = index + 1
+    })
+  }
+
+  return next
+}
 
 function App() {
   const [draft, setDraft] = useState<Draft>(() => {
@@ -321,9 +329,16 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       const image = new Image()
       image.onload = () => {
         const id = crypto.randomUUID()
-        const aspect = image.naturalWidth / Math.max(image.naturalHeight, 1)
-        const widthMm = Math.min(150, zone.widthMm * .7)
-        const heightMm = Math.min(widthMm / Math.max(aspect, .2), zone.heightMm * .7)
+        const maxWidthMm = Math.min(150, zone.widthMm * .7)
+        const maxHeightMm = zone.heightMm * .7
+        const sourceWidth = Math.max(image.naturalWidth, 1)
+        const sourceHeight = Math.max(image.naturalHeight, 1)
+        const fitScale = Math.min(
+          maxWidthMm / sourceWidth,
+          maxHeightMm / sourceHeight
+        )
+        const widthMm = sourceWidth * fitScale
+        const heightMm = sourceHeight * fitScale
 
         commit({
           ...draft,
