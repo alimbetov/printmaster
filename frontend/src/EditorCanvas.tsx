@@ -175,6 +175,8 @@ export default function EditorCanvas({
     [draft.activeSide, draft.elements]
   )
 
+  const selectedElement = activeElements.find(element => element.id === selectedId) ?? null
+
   useEffect(() => {
     const transformer = transformerRef.current
     const stage = stageRef.current
@@ -329,7 +331,7 @@ export default function EditorCanvas({
             {!readOnly && <Transformer
               ref={transformerRef}
               rotateEnabled
-              keepRatio={false}
+              keepRatio={selectedElement?.type !== 'TEXT'}
               flipEnabled={false}
               anchorSize={12}
               anchorCornerRadius={6}
