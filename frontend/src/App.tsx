@@ -446,7 +446,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   }
 
   const goPreview = () => {
-    navigate(status === 'BLOCKED' ? '/check' : '/preview')
+    navigate(status === 'BLOCKED' || status === 'DRAFT' ? '/check' : '/preview')
   }
 
   return <div className="editor-shell">
@@ -745,7 +745,7 @@ function DesignCheck({ draft }: { draft: Draft }) {
       <div className="check-card good">✓ {t('insideArea')}</div>
     </>}
 
-    {status !== 'BLOCKED'
+    {status === 'READY' || status === 'WARNING'
       ? <Link className="btn primary full" to="/preview">{t('continue')}</Link>
       : <Link className="btn secondary full" to="/editor">{t('edit')}</Link>}
   </main></div>
@@ -800,7 +800,7 @@ function FinalPreview({ draft, onApprove }: { draft: Draft, onApprove: () => voi
         <Link className="btn secondary full" to="/editor">{t('edit')}</Link>
         <button
           className="btn primary full"
-          disabled={status === 'BLOCKED'}
+          disabled={status === 'BLOCKED' || status === 'DRAFT'}
           onClick={() => {
             onApprove()
             navigate('/cart')
