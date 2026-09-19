@@ -525,10 +525,12 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         <span className="eyebrow">{t('estimate')}</span>
         <h3>{formatKzt(product.price, i18n.language)}</h3>
 
-        <GarmentColorPicker
+        <GarmentVariantPicker
           product={product}
-          selected={draft.color}
-          onChange={color => commit({ ...draft, color })}
+          color={draft.color}
+          size={draft.size}
+          onColor={color => commit({ ...draft, color })}
+          onSize={size => commit({ ...draft, size })}
         />
 
         <div className="mini-card">
@@ -584,10 +586,12 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         </div>}
 
         {sheet === 'STYLE' && <>
-          <GarmentColorPicker
+          <GarmentVariantPicker
             product={product}
-            selected={draft.color}
-            onChange={color => commit({ ...draft, color })}
+            color={draft.color}
+            size={draft.size}
+            onColor={color => commit({ ...draft, color })}
+            onSize={size => commit({ ...draft, size })}
           />
           <EditorInspector
             selected={selected}
@@ -620,35 +624,55 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   </div>
 }
 
-function GarmentColorPicker({
+function GarmentVariantPicker({
   product,
-  selected,
-  onChange
+  color,
+  size,
+  onColor,
+  onSize
 }: {
   product: (typeof products)[number]
-  selected: string
-  onChange: (color: string) => void
+  color: string
+  size: Size
+  onColor: (color: string) => void
+  onSize: (size: Size) => void
 }) {
   const { t } = useTranslation()
 
   return <div className="garment-color-picker">
     <div className="inspector-head">
       <b>{t('color')}</b>
-      <span>{product.colors.find(color => color.code === selected)?.name ?? selected}</span>
+      <span>{product.colors.find(item => item.code === color)?.name ?? color}</span>
     </div>
     <div className="color-swatches">
-      {product.colors.map(color =>
+      {product.colors.map(item =>
         <button
-          key={color.code}
+          key={item.code}
           type="button"
-          className={selected === color.code ? 'active' : ''}
-          title={color.name}
-          aria-label={color.name}
-          onClick={() => onChange(color.code)}
+          className={color === item.code ? 'active' : ''}
+          title={item.name}
+          aria-label={item.name}
+          onClick={() => onColor(item.code)}
         >
-          <i style={{ background: color.hex }}/>
+          <i style={{ background: item.hex }}/>
         </button>
       )}
+    </div>
+
+    <div className="variant-size-row">
+      <b>{t('size')}</b>
+      <div className="variant-size-chips">
+        {product.sizes.map(item =>
+          <button
+            key={item}
+            type="button"
+            className={size === item ? 'active' : ''}
+            onClick={() => onSize(item)}
+          >
+            {item}
+          </button>
+        )}
+      </div>
     </div>
   </div>
 }
