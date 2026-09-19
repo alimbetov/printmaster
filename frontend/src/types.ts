@@ -6,7 +6,7 @@ export type Product = {
   id: string
   name: string
   type: 'TSHIRT' | 'HOODIE'
-  description: string
+  descriptionKey: string
   price: number
   colors: Array<{ code: string; name: string; hex: string }>
   sizes: Size[]
@@ -24,6 +24,8 @@ export type DesignElement = {
   rotationDeg: number
 }
 
+export type DraftStatus = 'DRAFT' | 'READY' | 'WARNING'
+
 export type Draft = {
   id: string
   productId: string
@@ -31,5 +33,10 @@ export type Draft = {
   size: Size
   activeSide: Side
   elements: DesignElement[]
-  status: 'DRAFT' | 'READY' | 'WARNING'
+  status: DraftStatus
+}
+
+export type ApprovedDesign = {
+  approvedAt: string
+  draft: Draft
 }
