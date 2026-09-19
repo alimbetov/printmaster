@@ -221,3 +221,7 @@ main{max-width:1440px;margin:0 auto}.hero{min-height:680px;display:grid;grid-tem
   color:#9da0a8;
   line-height:1.45;
 }
+
+.garment-relief-summary small{color:#9da0a8;line-height:1.45}
+.relief-meter{height:8px;border-radius:999px;background:#303136;overflow:hidden;border:1px solid #41434a}
+.relief-meter i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#5b5e66,#8c78ff);transition:width .18s ease}
