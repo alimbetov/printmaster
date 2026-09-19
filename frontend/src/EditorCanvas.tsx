@@ -20,6 +20,8 @@ type Props = {
   onChange: (draft: Draft) => void
   readOnly?: boolean
   zoom?: number
+  panX?: number
+  panY?: number
 }
 
 function useElementImage(src?: string) {
@@ -134,7 +136,9 @@ export default function EditorCanvas({
   onSelect,
   onChange,
   readOnly = false,
-  zoom = 1
+  zoom = 1,
+  panX = 0,
+  panY = 0
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
@@ -293,7 +297,14 @@ export default function EditorCanvas({
 
   return (
     <div ref={containerRef} className="konva-host">
-      <div className="konva-stage-wrap" style={{ width: stageWidth, height: stageHeight }}>
+      <div
+        className="konva-stage-wrap"
+        style={{
+          width: stageWidth,
+          height: stageHeight,
+          transform: `translate(${panX}px, ${panY}px)`
+        }}
+      >
         <Stage
           ref={stageRef}
           width={stageWidth}
