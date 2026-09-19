@@ -961,7 +961,9 @@ function DesignCheck({ draft }: { draft: Draft }) {
         <p>
           {issue.code === 'LOW_DPI'
             ? `${t('warningImageHint')} ${issue.value ?? ''} DPI`
-            : 'Part of the selected element is outside the printable area.'}
+            : issue.code === 'OUTSIDE_PLACEMENT_FRAME'
+              ? 'Part of the design is outside your Placement Frame. Move the element or enlarge the frame.'
+              : 'Part of the selected element is outside the production printable area.'}
         </p>
         <Link to="/editor">{t('edit')}</Link>
       </div>
