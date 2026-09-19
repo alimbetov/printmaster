@@ -6,54 +6,70 @@ Define the customer-facing product before backend implementation. The first fron
 
 ## Product goal
 
-Enable a customer to confidently create a printable garment design on web, tablet, or mobile without needing print-production knowledge.
+Enable a customer to create a wearable design quickly and confidently on web, tablet or mobile without needing print-production knowledge.
 
-Primary UX principle:
+Primary UX principles:
 
 > The editor must make the safe action the easy action.
+
+> Creation should feel faster than configuration.
 
 The product must continuously communicate:
 - what garment is selected;
 - which side is being edited;
-- the physical print size in millimeters;
-- whether the design is printable;
-- what will be approved as the final proof.
+- what the design looks like now;
+- whether it is printable;
+- what will be approved as the final preview.
 
-## Primary user journey
+Physical dimensions remain accessible, but they are not the hero UI for casual users.
 
-1. Landing / catalog
-2. Product detail
-3. Variant selection
-4. Design editor
-5. Preflight review
-6. Server-proof preview (mock initially)
+## Entry journeys
+
+### Create-first — primary
+1. Home
+2. Start creating
+3. Add visual/text/sticker
+4. Choose or confirm garment/variant
+5. Design check
+6. Final preview
 7. Approval
 8. Cart
 9. Mock checkout
-10. Order confirmation / tracking
+10. Confirmation/tracking
+
+### Shop-first — secondary
+1. Catalog
+2. Product detail
+3. Variant selection
+4. Customize
+5. Design check
+6. Final preview
+7. Approval
+8. Cart
+9. Checkout
 
 ## Information architecture
 
-### Public
+### Discover
 - Home
 - Catalog
-- Product details
-- Help: printing, sizing, care
-- FAQ
+- Featured/remix inspiration
+- Product detail
+- Help: sizing, printing, care
 
-### Creation
+### Create
 - Editor
   - Product context
   - Side selector
   - Canvas
-  - Add image
-  - Add text
-  - Stickers
+  - Add
+  - Style
   - Layers
-  - Physical size
-  - Preflight issues
+  - Design check
   - Undo/redo
-  - Save state
+  - Save
+  - Preview
+- Remix
 
 ### Commerce
 - Cart
@@ -66,28 +82,61 @@ The product must continuously communicate:
 - My orders
 - Saved addresses
 - Reorder
+- Private/public sharing preferences
 
 ## Editor modes
 
-Keep modes explicit:
+Explicit technical modes remain internally:
 - SELECT
 - IMAGE
 - TEXT
 - STICKER
 - CROP
 
-Avoid free-form hidden mode switching.
+Customer-facing navigation should prefer intent:
+- Add
+- Style
+- Layers
+- Check
+- Preview
+
+Avoid exposing software-tool terminology unnecessarily.
 
 ## UI priorities
 
-Priority order inside editor:
-1. Garment + side context
-2. Canvas
-3. Selected object controls
-4. Preflight state
-5. Add-content tools
-6. Layer management
-7. Secondary settings
+Priority order:
+1. Garment + visible creative result
+2. Active side
+3. Selected-object direct controls
+4. Add/style actions
+5. Design-check status
+6. Undo/redo
+7. Layers
+8. Exact measurements / advanced settings
+
+## Progressive disclosure
+
+### Primary
+- upload
+- text
+- stickers
+- move
+- resize
+- quick placement presets
+- FRONT/BACK
+- preview
+
+### Secondary
+- crop
+- exact physical size
+- alignment
+- duplicate
+- layer ordering
+
+### Advanced
+- numeric dimensions
+- exact rotation
+- diagnostic details
 
 ## Initial capability boundaries
 
@@ -102,9 +151,12 @@ Supported:
 - layer ordering
 - FRONT/BACK
 - physical dimensions
-- safe/forbidden zones
+- print/safe/forbidden zones
 - warnings/blockers
 - undo/redo
+- quick placement presets
+- remix to new draft
+- share-preview mock
 
 Not supported initially:
 - arbitrary SVG uploads
@@ -115,6 +167,7 @@ Not supported initially:
 - zip hoodies
 - 3D garment simulation
 - AI generation
+- public comments/follower network
 
 ## Frontend domain state
 
@@ -129,8 +182,8 @@ Canonical client state should model:
 - element geometry in millimeters
 - asset references
 - crop in normalized asset coordinates
-- preflight result
-- proof status
+- preflight/design-check result
+- proof/final-preview status
 - dirty/saved state
 - optimistic version
 
@@ -139,19 +192,24 @@ Browser pixels remain a projection only.
 ## Recommended React module boundaries
 
 - app-shell
+- discovery
 - catalog
 - product-configurator
 - editor-shell
 - garment-canvas
 - editor-toolbar
+- placement-presets
 - layer-panel
 - asset-library
 - text-editor
 - sticker-library
+- vibe-packs
 - transform-controls
 - physical-measurements
 - preflight-panel
 - proof-review
+- remix
+- share-preview
 - cart
 - checkout-mock
 - order-tracking-mock
@@ -160,8 +218,6 @@ Browser pixels remain a projection only.
 - design-system
 
 ## State approach
-
-Use two categories:
 
 ### Server-like state
 Even while mocked:
@@ -172,6 +228,7 @@ Even while mocked:
 - saved designs
 - proofs
 - orders
+- share previews
 
 Represent through a mock API/query layer rather than importing JSON directly into pages.
 
@@ -182,18 +239,33 @@ Represent through a mock API/query layer rather than importing JSON directly int
 - open panels
 - temporary crop
 - hover/focus
+- active creative tool
 
 Persist only canonical design state, never raw canvas internals.
+
+## Language layer
+
+Customer language:
+- “Design check” instead of “Preflight”
+- “Final preview” instead of “Proof”
+- “Needs a fix” instead of “BLOCKER”
+- “Worth checking” instead of “WARNING”
+- “Looks ready” instead of “PASS”
+
+Technical terminology remains available in diagnostics/developer mode.
 
 ## Non-negotiable frontend invariants
 
 1. Pixels never become persisted physical geometry.
 2. Size/model change triggers revalidation before approval.
-3. A BLOCKER prevents proof approval.
+3. A production blocker prevents final-preview approval.
 4. Approved revision becomes read-only.
 5. Front/back are visibly distinguishable at all times.
 6. Undo/redo operates on design commands, not arbitrary component state.
 7. Autosave never silently overwrites a newer revision.
 8. Mobile gestures cannot change physical scale because of browser zoom.
 9. Any warning visible at approval remains attached to the approved revision.
-10. Proof view is visually distinct from editable preview.
+10. Final preview is visually distinct from editable preview.
+11. Remix creates a new draft revision.
+12. Share previews never expose original uploaded assets by default.
+13. Creation and purchase remain separate decisions.
