@@ -11,8 +11,8 @@ export const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
 export const normalizePlacementFrame = (
   frame?: Partial<PlacementFrameNormalized> | null
 ): PlacementFrameNormalized => {
-  const width = Math.min(.96, Math.max(.18, frame?.width ?? .84))
-  const height = Math.min(.96, Math.max(.18, frame?.height ?? .84))
+  const width = Math.min(1, Math.max(.10, frame?.width ?? .84))
+  const height = Math.min(1, Math.max(.10, frame?.height ?? .84))
   const x = Math.min(1 - width, Math.max(0, frame?.x ?? .08))
   const y = Math.min(1 - height, Math.max(0, frame?.y ?? .08))
   return { x, y, width, height }
