@@ -24,8 +24,10 @@ import {
 } from './mock'
 import i18n from './i18n'
 import {
+  frameContainsElements,
   frameToMm,
   getFrameForSide,
+  movePlacementFrameWithDesign,
   normalizePlacementFrame
 } from './placement'
 
@@ -493,6 +495,28 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     commit({ ...draft, activeSide: side })
   }
 
+  const resetPlacementFrame = () => {
+    const target = normalizePlacementFrame({
+      x: .08,
+      y: .08,
+      width: .84,
+      height: .84
+    })
+    const sideElements = draft.elements.filter(element => element.side === draft.activeSide)
+
+    if (!frameContainsElements(target, zone, sideElements)) {
+      alert('Default Placement Frame would exclude existing elements. Move or resize the design first.')
+      return
+    }
+
+    commit(movePlacementFrameWithDesign(
+      draft,
+      draft.activeSide,
+      target,
+      zone
+    ))
+  }
+
   const goPreview = () => {
     navigate(status === 'BLOCKED' || status === 'DRAFT' ? '/check' : '/preview')
   }
@@ -589,6 +613,17 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
           onColor={color => commit({ ...draft, color })}
           onSize={size => commit({ ...draft, size })}
         />
+
+        <div className="placement-summary">
+          <div className="inspector-head">
+            <b>Placement Frame</b>
+            <span>{(placementMm.widthMm / 10).toFixed(1)} × {(placementMm.heightMm / 10).toFixed(1)} cm</span>
+          </div>
+          <small>
+            Offset {(placementFrame.x * 100).toFixed(0)}% / {(placementFrame.y * 100).toFixed(0)}% inside Print Zone
+          </small>
+          <button onClick={resetPlacementFrame}>Reset placement</button>
+        </div>
 
         <div className="mini-card">
           <b>{t('designCheck')}</b>
@@ -957,7 +992,13 @@ function DesignCheck({ draft }: { draft: Draft }) {
         key={issue.code + issue.elementId}
         className={"check-card " + (issue.severity === 'BLOCKER' ? 'danger-card' : 'warning-card')}
       >
-        <b>{issue.code === 'LOW_DPI' ? t('warningImageTitle') : t('needsFix')}</b>
+        <b>{
+          issue.code === 'LOW_DPI'
+            ? t('warningImageTitle')
+            : issue.code === 'OUTSIDE_PLACEMENT_FRAME'
+              ? t('worthChecking')
+              : t('needsFix')
+        }</b>
         <p>
           {issue.code === 'LOW_DPI'
             ? `${t('warningImageHint')} ${issue.value ?? ''} DPI`
