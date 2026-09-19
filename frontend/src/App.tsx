@@ -2,6 +2,7 @@ import { ChangeEvent, useState } from 'react'
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import EditorCanvas from './EditorCanvas'
+import BodyPreview3D from './BodyPreview3D'
 import type {
   ApprovedDesign,
   DesignElement,
@@ -22,11 +23,29 @@ import {
   readStoredJson
 } from './mock'
 import i18n from './i18n'
+import {
+  frameContainsElements,
+  frameToMm,
+  getFrameForSide,
+  movePlacementFrameWithDesign,
+  normalizePlacementFrame
+} from './placement'
 
 const LOCAL_IMAGE_BUDGET_CHARS = 1_500_000
 
 const normalizeDraft = (draft: Draft): Draft => {
-  const next = { ...draft, elements: draft.elements.map(element => ({ ...element })) }
+  const legacy = draft as Draft & {
+    placementFrames?: Draft['placementFrames']
+  }
+
+  const next: Draft = {
+    ...draft,
+    placementFrames: {
+      FRONT: normalizePlacementFrame(legacy.placementFrames?.FRONT),
+      BACK: normalizePlacementFrame(legacy.placementFrames?.BACK)
+    },
+    elements: draft.elements.map(element => ({ ...element }))
+  }
 
   for (const side of ['FRONT', 'BACK'] as Side[]) {
     const ordered = next.elements
@@ -271,6 +290,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
   const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [viewMode, setViewMode] = useState<'FLAT' | 'BODY_3D'>('FLAT')
 
   const selected = draft.elements.find(element => element.id === selectedId) ?? null
   const activeElements = draft.elements
@@ -294,6 +315,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   }
 
   const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const placementFrame = getFrameForSide(draft, draft.activeSide)
+  const placementMm = frameToMm(placementFrame, zone)
   const maxZ = Math.max(0, ...draft.elements.map(element => element.zOrder))
 
   const addText = () => {
@@ -305,9 +328,9 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         type: 'TEXT',
         label: 'YOUR TEXT',
         side: draft.activeSide,
-        xMm: zone.xMm + zone.widthMm / 2,
-        yMm: zone.yMm + zone.heightMm / 2,
-        widthMm: Math.min(150, zone.widthMm * .72),
+        xMm: placementMm.xMm + placementMm.widthMm / 2,
+        yMm: placementMm.yMm + placementMm.heightMm / 2,
+        widthMm: Math.min(150, placementMm.widthMm * .72),
         heightMm: 42,
         rotationDeg: 0,
         zOrder: maxZ + 1,
@@ -333,8 +356,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         type: 'STICKER',
         label: '★',
         side: draft.activeSide,
-        xMm: zone.xMm + zone.widthMm / 2,
-        yMm: zone.yMm + zone.heightMm / 2,
+        xMm: placementMm.xMm + placementMm.widthMm / 2,
+        yMm: placementMm.yMm + placementMm.heightMm / 2,
         widthMm: 70,
         heightMm: 70,
         rotationDeg: 0,
@@ -374,8 +397,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       const image = new Image()
       image.onload = () => {
         const id = crypto.randomUUID()
-        const maxWidthMm = Math.min(150, zone.widthMm * .7)
-        const maxHeightMm = zone.heightMm * .7
+        const maxWidthMm = Math.min(150, placementMm.widthMm * .7)
+        const maxHeightMm = placementMm.heightMm * .7
         const sourceWidth = Math.max(image.naturalWidth, 1)
         const sourceHeight = Math.max(image.naturalHeight, 1)
         const fitScale = Math.min(
@@ -392,8 +415,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
             type: 'IMAGE',
             label: file.name,
             side: draft.activeSide,
-            xMm: zone.xMm + zone.widthMm / 2,
-            yMm: zone.yMm + zone.heightMm / 2,
+            xMm: placementMm.xMm + placementMm.widthMm / 2,
+            yMm: placementMm.yMm + placementMm.heightMm / 2,
             widthMm,
             heightMm,
             rotationDeg: 0,
@@ -439,8 +462,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const centerSelected = () => {
     if (!selected) return
     updateElement(selected.id, {
-      xMm: zone.xMm + zone.widthMm / 2,
-      yMm: zone.yMm + zone.heightMm / 2
+      xMm: placementMm.xMm + placementMm.widthMm / 2,
+      yMm: placementMm.yMm + placementMm.heightMm / 2
     })
   }
 
@@ -470,6 +493,28 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const setSide = (side: Side) => {
     setSelectedId(null)
     commit({ ...draft, activeSide: side })
+  }
+
+  const resetPlacementFrame = () => {
+    const target = normalizePlacementFrame({
+      x: .08,
+      y: .08,
+      width: .84,
+      height: .84
+    })
+    const sideElements = draft.elements.filter(element => element.side === draft.activeSide)
+
+    if (!frameContainsElements(target, zone, sideElements)) {
+      alert('Default Placement Frame would exclude existing elements. Move or resize the design first.')
+      return
+    }
+
+    commit(movePlacementFrameWithDesign(
+      draft,
+      draft.activeSide,
+      target,
+      zone
+    ))
   }
 
   const goPreview = () => {
@@ -503,23 +548,58 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       </aside>
 
       <section className="canvas-area">
-        <EditorCanvas
+        <div className="canvas-mode-switch">
+          <button
+            className={viewMode === 'FLAT' ? 'active' : ''}
+            onClick={() => setViewMode('FLAT')}
+          >
+            Flat
+          </button>
+          <button
+            className={viewMode === 'BODY_3D' ? 'active' : ''}
+            onClick={() => {
+              setSelectedId(null)
+              setViewMode('BODY_3D')
+            }}
+          >
+            Body 3D
+          </button>
+        </div>
+
+        {viewMode === 'FLAT' ? <>
+          <EditorCanvas
+            draft={draft}
+            garmentColor={garmentColor}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onChange={commit}
+            zoom={zoom}
+            panX={pan.x}
+            panY={pan.y}
+          />
+          <div className="canvas-zoom">
+            <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
+            <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Fit</button>
+            <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
+            <span>{Math.round(zoom * 100)}%</span>
+          </div>
+          <div className="canvas-pan">
+            <button aria-label="Move workspace left" onClick={() => setPan(value => ({ ...value, x: value.x - 40 }))}>←</button>
+            <div>
+              <button aria-label="Move workspace up" onClick={() => setPan(value => ({ ...value, y: value.y - 40 }))}>↑</button>
+              <button aria-label="Center workspace" onClick={() => setPan({ x: 0, y: 0 })}>◎</button>
+              <button aria-label="Move workspace down" onClick={() => setPan(value => ({ ...value, y: value.y + 40 }))}>↓</button>
+            </div>
+            <button aria-label="Move workspace right" onClick={() => setPan(value => ({ ...value, x: value.x + 40 }))}>→</button>
+          </div>
+          {selected && <div className="measure">
+            {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
+          </div>}
+        </> : <BodyPreview3D
           draft={draft}
           garmentColor={garmentColor}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
           onChange={commit}
-          zoom={zoom}
-        />
-        <div className="canvas-zoom">
-          <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
-          <button onClick={() => setZoom(1)}>Fit</button>
-          <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
-          <span>{Math.round(zoom * 100)}%</span>
-        </div>
-        {selected && <div className="measure">
-          {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
-        </div>}
+        />}
       </section>
 
       <aside className="context-panel">
@@ -534,6 +614,17 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
           onSize={size => commit({ ...draft, size })}
         />
 
+        <div className="placement-summary">
+          <div className="inspector-head">
+            <b>Placement Frame</b>
+            <span>{(placementMm.widthMm / 10).toFixed(1)} × {(placementMm.heightMm / 10).toFixed(1)} cm</span>
+          </div>
+          <small>
+            Offset {(placementFrame.x * 100).toFixed(0)}% / {(placementFrame.y * 100).toFixed(0)}% inside Print Zone
+          </small>
+          <button onClick={resetPlacementFrame}>Reset placement</button>
+        </div>
+
         <div className="mini-card">
           <b>{t('designCheck')}</b>
           <StatusInline status={status} />
@@ -543,8 +634,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         <EditorInspector
           selected={selected}
           zoneCenter={{
-            xMm: zone.xMm + zone.widthMm / 2,
-            yMm: zone.yMm + zone.heightMm / 2
+            xMm: placementMm.xMm + placementMm.widthMm / 2,
+            yMm: placementMm.yMm + placementMm.heightMm / 2
           }}
           onUpdate={patch => selected && updateElement(selected.id, patch)}
           onDelete={removeSelected}
@@ -901,11 +992,19 @@ function DesignCheck({ draft }: { draft: Draft }) {
         key={issue.code + issue.elementId}
         className={"check-card " + (issue.severity === 'BLOCKER' ? 'danger-card' : 'warning-card')}
       >
-        <b>{issue.code === 'LOW_DPI' ? t('warningImageTitle') : t('needsFix')}</b>
+        <b>{
+          issue.code === 'LOW_DPI'
+            ? t('warningImageTitle')
+            : issue.code === 'OUTSIDE_PLACEMENT_FRAME'
+              ? t('worthChecking')
+              : t('needsFix')
+        }</b>
         <p>
           {issue.code === 'LOW_DPI'
             ? `${t('warningImageHint')} ${issue.value ?? ''} DPI`
-            : 'Part of the selected element is outside the printable area.'}
+            : issue.code === 'OUTSIDE_PLACEMENT_FRAME'
+              ? 'Part of the design is outside your Placement Frame. Move the element or enlarge the frame.'
+              : 'Part of the selected element is outside the production printable area.'}
         </p>
         <Link to="/editor">{t('edit')}</Link>
       </div>
