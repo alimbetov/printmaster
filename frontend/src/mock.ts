@@ -8,6 +8,7 @@ import type {
   Side,
   Size
 } from './types'
+import { frameToMm, getFrameForSide } from './placement'
 
 export const products: Product[] = [
   {
@@ -223,6 +224,7 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
   for (const element of draft.elements) {
     const zone = element.side === 'FRONT' ? profile.front : profile.back
     const half = rotatedHalfExtents(element.widthMm, element.heightMm, element.rotationDeg)
+    const placement = frameToMm(getFrameForSide(draft, element.side), zone)
 
     const left = element.xMm - half.x
     const right = element.xMm + half.x
@@ -238,6 +240,19 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
       issues.push({
         code: 'OUTSIDE_PRINT_AREA',
         severity: 'BLOCKER',
+        elementId: element.id
+      })
+    }
+
+    if (
+      left < placement.xMm ||
+      right > placement.xMm + placement.widthMm ||
+      top < placement.yMm ||
+      bottom > placement.yMm + placement.heightMm
+    ) {
+      issues.push({
+        code: 'OUTSIDE_PLACEMENT_FRAME',
+        severity: 'WARNING',
         elementId: element.id
       })
     }
