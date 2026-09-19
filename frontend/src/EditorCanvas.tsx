@@ -10,7 +10,7 @@ import {
   Transformer
 } from 'react-konva'
 import type { Draft, DesignElement, MockPrintProfile } from './types'
-import { printProfiles } from './mock'
+import { getPrintProfile } from './mock'
 
 type Props = {
   draft: Draft
@@ -141,7 +141,7 @@ export default function EditorCanvas({
   const transformerRef = useRef<Konva.Transformer>(null)
   const [viewport, setViewport] = useState({ width: 600, height: 700 })
 
-  const profile = printProfiles[draft.productId] ?? printProfiles['hoodie-basic']
+  const profile = getPrintProfile(draft.productId, draft.size)
   const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
 
   useEffect(() => {
