@@ -1,11 +1,11 @@
-import type { Draft, Product } from './types'
+import type { Draft, DraftStatus, Product, Side } from './types'
 
 export const products: Product[] = [
   {
     id: 'tee-basic',
     name: 'Basic Tee',
     type: 'TSHIRT',
-    description: 'Плотная базовая футболка для принтов спереди и сзади.',
+    descriptionKey: 'product.teeDescription',
     price: 6900,
     colors: [
       { code: 'black', name: 'Black', hex: '#171717' },
@@ -17,7 +17,7 @@ export const products: Product[] = [
     id: 'hoodie-basic',
     name: 'Basic Hoodie',
     type: 'HOODIE',
-    description: 'Мягкий худи relaxed fit с большой зоной кастомизации.',
+    descriptionKey: 'product.hoodieDescription',
     price: 12900,
     colors: [
       { code: 'black', name: 'Black', hex: '#171717' },
@@ -49,5 +49,32 @@ export const createDraft = (productId = 'hoodie-basic'): Draft => ({
   ]
 })
 
+export const getDraftStatus = (draft: Draft): DraftStatus => {
+  if (draft.elements.length === 0) return 'DRAFT'
+  return draft.elements.some(element => element.type === 'IMAGE') ? 'WARNING' : 'READY'
+}
+
+export const getSidesInUse = (draft: Draft): Side[] =>
+  (['FRONT', 'BACK'] as Side[]).filter(side =>
+    draft.elements.some(element => element.side === side)
+  )
+
+export const getDisplayLabel = (draft: Draft, side: Side) =>
+  draft.elements.find(element => element.side === side)?.label ?? ''
+
 export const formatKzt = (value: number, locale = 'ru-KZ') =>
-  new Intl.NumberFormat(locale, { style: 'currency', currency: 'KZT', maximumFractionDigits: 0 }).format(value)
+  new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'KZT',
+    maximumFractionDigits: 0
+  }).format(value)
+
+export const readStoredJson = <T>(key: string): T | null => {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) as T : null
+  } catch {
+    localStorage.removeItem(key)
+    return null
+  }
+}
