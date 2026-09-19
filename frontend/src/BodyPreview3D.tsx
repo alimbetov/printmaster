@@ -150,7 +150,10 @@ export default function BodyPreview3D({
   } | null>(null)
 
   const product = products.find(item => item.id === draft.productId) ?? products[0]
-  const profile = getPrintProfile(draft.productId, draft.size)
+  const profile = useMemo(
+    () => getPrintProfile(draft.productId, draft.size),
+    [draft.productId, draft.size]
+  )
   const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
   const canonicalFrame = getFrameForSide(draft, draft.activeSide)
   const visibleFrame = dragPreview ?? canonicalFrame
@@ -448,16 +451,20 @@ export default function BodyPreview3D({
               width: .84,
               height: .84
             })
-            if (!frameContainsElements(next, zone, activeElements)) {
-              alert('Default placement frame would exclude current elements. Move or resize the design first.')
-              return
-            }
-            onChange(movePlacementFrameWithDesign(
+            const candidate = movePlacementFrameWithDesign(
               draft,
               draft.activeSide,
               next,
               zone
-            ))
+            )
+            const candidateElements = candidate.elements.filter(
+              element => element.side === draft.activeSide
+            )
+            if (!frameContainsElements(next, zone, candidateElements)) {
+              alert('Default placement frame would exclude current elements after reset. Enlarge the frame or move the design first.')
+              return
+            }
+            onChange(candidate)
           }}
         >
           Reset placement frame
