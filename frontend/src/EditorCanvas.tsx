@@ -18,6 +18,7 @@ type Props = {
   selectedId: string | null
   onSelect: (id: string | null) => void
   onChange: (draft: Draft) => void
+  readOnly?: boolean
 }
 
 function useElementImage(src?: string) {
@@ -73,9 +74,9 @@ function CanvasImage({
       fill={image ? undefined : '#777'}
       stroke={selected ? '#6c4dff' : undefined}
       strokeWidth={selected ? 2 : 0}
-      draggable
-      onClick={onSelect}
-      onTap={onSelect}
+      draggable={!readOnly}
+      onClick={readOnly ? undefined : onSelect}
+      onTap={readOnly ? undefined : onSelect}
       onDragEnd={event => onCommit(event.target)}
       onTransformEnd={event => onCommit(event.target)}
     />
@@ -128,7 +129,8 @@ export default function EditorCanvas({
   garmentColor,
   selectedId,
   onSelect,
-  onChange
+  onChange,
+  readOnly = false
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
@@ -277,7 +279,7 @@ export default function EditorCanvas({
           width={stageWidth}
           height={stageHeight}
           onMouseDown={event => {
-            if (event.target === event.target.getStage()) onSelect(null)
+            if (!readOnly && event.target === event.target.getStage()) onSelect(null)
           }}
           onTouchStart={event => {
             if (event.target === event.target.getStage()) onSelect(null)
@@ -321,7 +323,7 @@ export default function EditorCanvas({
 
           <Layer>
             {activeElements.map(renderElement)}
-            <Transformer
+            {!readOnly && <Transformer
               ref={transformerRef}
               rotateEnabled
               keepRatio={false}
@@ -337,7 +339,7 @@ export default function EditorCanvas({
                 }
                 return newBox
               }}
-            />
+            />}
           </Layer>
         </Stage>
       </div>
