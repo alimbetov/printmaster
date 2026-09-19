@@ -2,13 +2,23 @@ export type Locale = 'ru-KZ' | 'kk-KZ' | 'en-US'
 export type Side = 'FRONT' | 'BACK'
 export type Size = 'S' | 'M' | 'L' | 'XL'
 
+export type ProductColor = {
+  code: string
+  name: string
+  hex: string
+}
+
 export type Product = {
   id: string
   name: string
+  collection: string
   type: 'TSHIRT' | 'HOODIE'
+  fit: 'REGULAR' | 'RELAXED' | 'OVERSIZE'
   descriptionKey: string
+  material: string
+  gsm: number
   price: number
-  colors: Array<{ code: string; name: string; hex: string }>
+  colors: ProductColor[]
   sizes: Size[]
 }
 
@@ -30,6 +40,14 @@ export type DesignElement = {
 
   // Element appearance/content.
   fill?: string
+
+  // Text styling. Stored as domain values, not canvas pixels.
+  fontFamily?: string
+  fontStyle?: 'normal' | 'italic'
+  fontWeight?: 400 | 600 | 700 | 800 | 900
+  textAlign?: 'left' | 'center' | 'right'
+  letterSpacingMm?: number
+
   imageDataUrl?: string
   sourceWidthPx?: number
   sourceHeightPx?: number
