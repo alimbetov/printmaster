@@ -150,16 +150,16 @@ export const fontCatalog = [
   { id: 'trebuchet', name: 'Trebuchet', family: '"Trebuchet MS", sans-serif', category: 'Friendly' }
 ] as const
 
-export const createDraft = (productId = 'hoodie-basic'): Draft => {
+export const createDraft = (productId = 'hoodie-basic', size: Size = 'L'): Draft => {
   const product = products.find(item => item.id === productId) ?? products[0]
-  const profile = getPrintProfile(productId, 'L')
+  const profile = getPrintProfile(productId, size)
   const zone = profile.front
 
   return {
   id: 'draft-demo',
   productId,
   color: product.colors[0].code,
-  size: 'L',
+  size,
   activeSide: 'FRONT',
   status: 'READY',
   elements: [
