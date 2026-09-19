@@ -2,6 +2,7 @@ import { ChangeEvent, useState } from 'react'
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import EditorCanvas from './EditorCanvas'
+import BodyPreview3D from './BodyPreview3D'
 import type {
   ApprovedDesign,
   DesignElement,
@@ -271,6 +272,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
   const [zoom, setZoom] = useState(1)
+  const [viewMode, setViewMode] = useState<'FLAT' | 'BODY_3D'>('FLAT')
 
   const selected = draft.elements.find(element => element.id === selectedId) ?? null
   const activeElements = draft.elements
@@ -503,23 +505,46 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       </aside>
 
       <section className="canvas-area">
-        <EditorCanvas
+        <div className="canvas-mode-switch">
+          <button
+            className={viewMode === 'FLAT' ? 'active' : ''}
+            onClick={() => setViewMode('FLAT')}
+          >
+            Flat
+          </button>
+          <button
+            className={viewMode === 'BODY_3D' ? 'active' : ''}
+            onClick={() => {
+              setSelectedId(null)
+              setViewMode('BODY_3D')
+            }}
+          >
+            Body 3D
+          </button>
+        </div>
+
+        {viewMode === 'FLAT' ? <>
+          <EditorCanvas
+            draft={draft}
+            garmentColor={garmentColor}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onChange={commit}
+            zoom={zoom}
+          />
+          <div className="canvas-zoom">
+            <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
+            <button onClick={() => setZoom(1)}>Fit</button>
+            <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
+            <span>{Math.round(zoom * 100)}%</span>
+          </div>
+          {selected && <div className="measure">
+            {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
+          </div>}
+        </> : <BodyPreview3D
           draft={draft}
           garmentColor={garmentColor}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onChange={commit}
-          zoom={zoom}
-        />
-        <div className="canvas-zoom">
-          <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
-          <button onClick={() => setZoom(1)}>Fit</button>
-          <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
-          <span>{Math.round(zoom * 100)}%</span>
-        </div>
-        {selected && <div className="measure">
-          {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
-        </div>}
+        />}
       </section>
 
       <aside className="context-panel">
