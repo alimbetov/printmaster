@@ -47,6 +47,7 @@ export type DesignElement = {
   fontWeight?: 400 | 600 | 700 | 800 | 900
   textAlign?: 'left' | 'center' | 'right'
   letterSpacingMm?: number
+  lineHeight?: number
 
   imageDataUrl?: string
   sourceWidthPx?: number
