@@ -12,6 +12,7 @@ import type {
 } from './types'
 import {
   createDraft,
+  fontCatalog,
   formatKzt,
   getDraftStatus,
   getPreflightIssues,
@@ -209,6 +210,12 @@ function ProductPage({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft)
       <span className="eyebrow">{product.type}</span>
       <h1>{product.name}</h1>
       <p>{t(product.descriptionKey)}</p>
+      <div className="product-meta">
+        <span>{product.collection}</span>
+        <span>{product.fit}</span>
+        <span>{product.gsm} GSM</span>
+        <span>{product.material}</span>
+      </div>
 
       <h4>{t('color')}</h4>
       <div className="chips">
@@ -251,6 +258,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const profile = printProfiles[draft.productId]
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
+  const [zoom, setZoom] = useState(1)
 
   const selected = draft.elements.find(element => element.id === selectedId) ?? null
   const activeElements = draft.elements
@@ -291,7 +299,12 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         heightMm: 42,
         rotationDeg: 0,
         zOrder: maxZ + 1,
-        fill: garmentColor === '#f4f4f2' ? '#111214' : '#ffffff'
+        fill: garmentColor === '#f4f4f2' ? '#111214' : '#ffffff',
+        fontFamily: fontCatalog[0].family,
+        fontStyle: 'normal',
+        fontWeight: 800,
+        textAlign: 'center',
+        letterSpacingMm: 0
       }]
     })
     setSelectedId(id)
@@ -483,7 +496,14 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
           selectedId={selectedId}
           onSelect={setSelectedId}
           onChange={commit}
+          zoom={zoom}
         />
+        <div className="canvas-zoom">
+          <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
+          <button onClick={() => setZoom(1)}>Fit</button>
+          <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
+          <span>{Math.round(zoom * 100)}%</span>
+        </div>
         {selected && <div className="measure">
           {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
         </div>}
@@ -492,6 +512,12 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       <aside className="context-panel">
         <span className="eyebrow">{t('estimate')}</span>
         <h3>{formatKzt(product.price, i18n.language)}</h3>
+
+        <GarmentColorPicker
+          product={product}
+          selected={draft.color}
+          onChange={color => commit({ ...draft, color })}
+        />
 
         <div className="mini-card">
           <b>{t('designCheck')}</b>
@@ -546,6 +572,11 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         </div>}
 
         {sheet === 'STYLE' && <>
+          <GarmentColorPicker
+            product={product}
+            selected={draft.color}
+            onChange={color => commit({ ...draft, color })}
+          />
           <EditorInspector
             selected={selected}
             zoneCenter={{
@@ -574,6 +605,39 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         />}
       </div>
     </div>}
+  </div>
+}
+
+function GarmentColorPicker({
+  product,
+  selected,
+  onChange
+}: {
+  product: (typeof products)[number]
+  selected: string
+  onChange: (color: string) => void
+}) {
+  const { t } = useTranslation()
+
+  return <div className="garment-color-picker">
+    <div className="inspector-head">
+      <b>{t('color')}</b>
+      <span>{product.colors.find(color => color.code === selected)?.name ?? selected}</span>
+    </div>
+    <div className="color-swatches">
+      {product.colors.map(color =>
+        <button
+          key={color.code}
+          type="button"
+          className={selected === color.code ? 'active' : ''}
+          title={color.name}
+          aria-label={color.name}
+          onClick={() => onChange(color.code)}
+        >
+          <i style={{ background: color.hex }}/>
+        </button>
+      )}
+    </div>
   </div>
 }
 
@@ -611,13 +675,71 @@ function EditorInspector({
       <span>{(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm</span>
     </div>
 
-    {selected.type === 'TEXT' && <label>
-      {t('text')}
-      <input
-        value={selected.label}
-        onChange={event => onUpdate({ label: event.target.value })}
-      />
-    </label>}
+    {selected.type === 'TEXT' && <>
+      <label>
+        {t('text')}
+        <input
+          value={selected.label}
+          onChange={event => onUpdate({ label: event.target.value })}
+        />
+      </label>
+
+      <label>
+        Font
+        <select
+          value={selected.fontFamily ?? fontCatalog[0].family}
+          onChange={event => onUpdate({ fontFamily: event.target.value })}
+        >
+          {fontCatalog.map(font =>
+            <option key={font.id} value={font.family}>{font.name} · {font.category}</option>
+          )}
+        </select>
+      </label>
+
+      <div className="text-style-grid">
+        <label>Weight
+          <select
+            value={selected.fontWeight ?? 800}
+            onChange={event => onUpdate({ fontWeight: Number(event.target.value) as 400 | 600 | 700 | 800 | 900 })}
+          >
+            <option value="400">Regular</option>
+            <option value="600">Semi</option>
+            <option value="700">Bold</option>
+            <option value="800">Extra</option>
+            <option value="900">Black</option>
+          </select>
+        </label>
+        <label>Style
+          <select
+            value={selected.fontStyle ?? 'normal'}
+            onChange={event => onUpdate({ fontStyle: event.target.value as 'normal' | 'italic' })}
+          >
+            <option value="normal">Normal</option>
+            <option value="italic">Italic</option>
+          </select>
+        </label>
+        <label>Align
+          <select
+            value={selected.textAlign ?? 'center'}
+            onChange={event => onUpdate({ textAlign: event.target.value as 'left' | 'center' | 'right' })}
+          >
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+        </label>
+        <label>Spacing mm
+          <input
+            type="number"
+            min="-1"
+            max="10"
+            step=".2"
+            value={selected.letterSpacingMm ?? 0}
+            onChange={event => onUpdate({ letterSpacingMm: Number(event.target.value) })}
+          />
+        </label>
+      </div>
+    </>}
 
     {(selected.type === 'TEXT' || selected.type === 'STICKER') && <label>
       {t('color')}
