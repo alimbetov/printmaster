@@ -19,6 +19,7 @@ Frontend-first product and UX design for the mock-driven MVP.
 13. [UI Component Specification](./ui-component-spec.md)
 14. [Low-Fidelity Wireframes](./low-fidelity-wireframes.md)
 15. [Final Preview Screen](./final-preview-screen.md)
+16. [Internationalization & Localization](./internationalization-localization.md)
 
 ## Design principles
 
@@ -35,6 +36,7 @@ Frontend-first product and UX design for the mock-driven MVP.
 - Privacy is the default for uploaded artwork and share previews.
 - Feature components consume semantic design tokens rather than hardcoded styling.
 - Low-fidelity wireframes define information hierarchy, not final branding.
+- UI localization supports Kazakh, Russian and English without changing design geometry or customer artwork.
 
 ## Pre-code design status
 
