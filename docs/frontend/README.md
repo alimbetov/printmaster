@@ -20,6 +20,8 @@ Frontend-first product and UX design for the mock-driven MVP.
 14. [Low-Fidelity Wireframes](./low-fidelity-wireframes.md)
 15. [Final Preview Screen](./final-preview-screen.md)
 16. [Internationalization & Localization](./internationalization-localization.md)
+17. [9 Simulated Expert Focus Groups](./focus-groups-9-expert-review.md)
+18. [Focus Group Action Decisions](./focus-group-action-decisions.md)
 
 ## Design principles
 
