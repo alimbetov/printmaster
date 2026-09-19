@@ -47,13 +47,15 @@ function CanvasImage({
   scale,
   selected,
   onSelect,
-  onCommit
+  onCommit,
+  readOnly
 }: {
   element: DesignElement
   scale: number
   selected: boolean
   onSelect: () => void
   onCommit: (node: Konva.Node) => void
+  readOnly: boolean
 }) {
   const image = useElementImage(element.imageDataUrl)
   const width = element.widthMm * scale
@@ -229,9 +231,9 @@ export default function EditorCanvas({
       offsetX: width / 2,
       offsetY: height / 2,
       rotation: element.rotationDeg,
-      draggable: true,
-      onClick: () => onSelect(element.id),
-      onTap: () => onSelect(element.id),
+      draggable: !readOnly,
+      onClick: readOnly ? undefined : () => onSelect(element.id),
+      onTap: readOnly ? undefined : () => onSelect(element.id),
       onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) =>
         commitNode(element, event.target),
       onTransformEnd: (event: Konva.KonvaEventObject<Event>) =>
@@ -247,6 +249,7 @@ export default function EditorCanvas({
           selected={selectedId === element.id}
           onSelect={() => onSelect(element.id)}
           onCommit={node => commitNode(element, node)}
+          readOnly={readOnly}
         />
       )
     }
@@ -282,7 +285,7 @@ export default function EditorCanvas({
             if (!readOnly && event.target === event.target.getStage()) onSelect(null)
           }}
           onTouchStart={event => {
-            if (event.target === event.target.getStage()) onSelect(null)
+            if (!readOnly && event.target === event.target.getStage()) onSelect(null)
           }}
         >
           <Layer listening={false}>
