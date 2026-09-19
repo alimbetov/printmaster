@@ -528,19 +528,22 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       width: .84,
       height: .84
     })
-    const sideElements = draft.elements.filter(element => element.side === draft.activeSide)
-
-    if (!frameContainsElements(target, zone, sideElements)) {
-      alert('Default Placement Frame would exclude existing elements. Move or resize the design first.')
-      return
-    }
-
-    commit(movePlacementFrameWithDesign(
+    const candidate = movePlacementFrameWithDesign(
       draft,
       draft.activeSide,
       target,
       zone
-    ))
+    )
+    const candidateElements = candidate.elements.filter(
+      element => element.side === draft.activeSide
+    )
+
+    if (!frameContainsElements(target, zone, candidateElements)) {
+      alert('Default Placement Frame would exclude existing elements after reset. Enlarge the frame or move the design first.')
+      return
+    }
+
+    commit(candidate)
   }
 
   const goPreview = () => {
@@ -1055,6 +1058,10 @@ function FinalPreview({ draft, onApprove }: { draft: Draft, onApprove: () => voi
   const sides = getSidesInUse(draft)
   const [side, setSide] = useState<Side>(sides[0] ?? 'FRONT')
   const status = getDraftStatus(draft)
+  const previewProfile = getPrintProfile(draft.productId, draft.size)
+  const previewZone = side === 'FRONT' ? previewProfile.front : previewProfile.back
+  const previewFrame = getFrameForSide(draft, side)
+  const previewPlacement = frameToMm(previewFrame, previewZone)
 
   const previewDraft = { ...draft, activeSide: side }
 
@@ -1089,7 +1096,12 @@ function FinalPreview({ draft, onApprove }: { draft: Draft, onApprove: () => voi
       </div>
 
       <StatusInline status={status} />
-      <p className="muted">{t('printSize')}: 25 × 30 cm max</p>
+      <p className="muted">
+        Placement: {(previewPlacement.widthMm / 10).toFixed(1)} × {(previewPlacement.heightMm / 10).toFixed(1)} cm
+      </p>
+      <p className="muted">
+        Print zone: {(previewZone.widthMm / 10).toFixed(1)} × {(previewZone.heightMm / 10).toFixed(1)} cm
+      </p>
       <p className="note">{t('previewApprox')}</p>
 
       <div className="actions column">
