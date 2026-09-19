@@ -38,23 +38,34 @@ validate navigation, responsive behavior, unsaved-change behavior, and cart/proo
 
 ## Stage F2 — Design system
 
-Define:
-- typography
-- spacing scale
-- radii
-- elevation
-- form controls
-- buttons
-- segmented control
-- badges
-- sheets/drawers
-- dialogs
-- toast/undo
-- status patterns
-- empty/error/loading/conflict states
-- accessible focus and touch-target rules
+**Design specification complete; implementation pending.**
 
-Do not lock visual branding too early.
+Defined:
+- semantic color system;
+- typography scale;
+- 4px spacing grid;
+- radii/elevation;
+- page grids;
+- buttons/icon buttons;
+- cards/chips/segmented controls;
+- inputs;
+- bottom sheets;
+- editor dock;
+- Design check badges;
+- toast/undo;
+- loading/error/conflict patterns;
+- focus/accessibility rules;
+- reusable component inventory;
+- mobile/tablet/desktop low-fidelity wireframes;
+- Final Preview screen contract.
+
+References:
+- ui-design-system.md
+- ui-component-spec.md
+- low-fidelity-wireframes.md
+- final-preview-screen.md
+
+Do not lock final brand decoration before the clickable shell is tested.
 
 ## Stage F3 — Editor geometry prototype
 
