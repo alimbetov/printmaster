@@ -2,159 +2,207 @@
 
 ## Goal
 
-Make a production-constrained editor feel simple to a non-designer.
+Make a production-constrained editor feel like a lightweight creative playground, not professional design software.
+
+The user should reach a meaningful visual result quickly while production rules operate mostly in the background.
 
 ## Default editor state
 
 On entry:
-- selected garment/variant is visible;
-- FRONT is active;
-- print zone shown subtly;
-- safe zone visible only when useful;
-- forbidden zones represented clearly but without overwhelming;
-- Add image / Add text / Stickers are immediately available;
-- physical size appears only after object selection or as compact summary.
+- garment fills the main visual area;
+- selected variant is visible but compact;
+- FRONT is active and obvious;
+- Add is the strongest creative action;
+- print zone is subtle;
+- safe/forbidden guides appear when relevant;
+- no technical panels are open by default;
+- physical dimensions are available contextually;
+- Design check status is visible but visually secondary while creating.
+
+## First-minute experience
+
+Target flow:
+1. Add image / text / sticker.
+2. Element appears at a safe default position.
+3. User directly manipulates it.
+4. Quick placement suggestions appear where useful.
+5. Status updates without interrupting.
+6. Preview is one tap away.
+
+Do not force a tutorial before creation.
 
 ## Canvas semantics
 
 Display layers:
 1. garment mockup;
-2. print-zone guide;
-3. safe/warning/forbidden guides;
-4. customer design elements;
-5. selection controls;
-6. non-printing UI overlays.
+2. contextual print/safe/forbidden guides;
+3. customer design elements;
+4. selection controls;
+5. non-printing UI overlays.
 
-Only layer 4 contributes to production artwork.
+Only customer design elements contribute to production artwork.
+
+## Quick placement presets
+
+For supported garment/side combinations:
+- Center
+- Small chest
+- Big front
+- Big back
+- Minimal
+- Name + number where appropriate
+
+Preset behavior:
+- deterministic geometry;
+- respects PrintProfile;
+- produces an ordinary editable draft;
+- never creates an approved state automatically.
 
 ## Add image flow
 
 1. Choose/upload image.
-2. Validate file.
-3. Show transparency preview when relevant.
+2. Validate.
+3. Show visual preview immediately.
 4. Normalize mock asset.
-5. Place at a safe default size inside print zone.
-6. Select it automatically.
-7. Show physical dimensions and quality.
-8. If DPI is weak, show warning immediately.
+5. Place at a safe useful size.
+6. Select automatically.
+7. Show quality feedback only if relevant.
+8. Offer quick placement suggestions.
 
-Do not insert an uploaded image at its native pixel dimensions.
+Avoid technical DPI-first language.
+
+Customer copy:
+“Looks sharp”
+or
+“This may print blurry if you make it this big.”
 
 ## Add text flow
 
-Fields:
-- text
-- approved font
+Primary UI:
+- enter text
+- visual font carousel
 - color
-- size
+- quick size/style presets
+
+Secondary:
+- numeric size
 - alignment
-- basic weight/style if supported
+- advanced options
 
-Default behavior:
-- create centered text within safe zone;
-- live physical size feedback;
-- block unsupported glyph combinations;
-- preserve text as editable until approval.
+Default:
+- centered safely;
+- editable immediately;
+- unsupported glyphs caught early.
 
-## Stickers
+## Stickers and vibe packs
 
-MVP stickers are curated platform assets.
-Categories:
-- basic shapes
+Sticker discovery should be visual and quick.
+
+Categories can include:
 - symbols
-- decorative
-- local themes
+- shapes
+- cute
+- street
+- sport
+- local
 - seasonal
 
-Every sticker has:
-- id/version
-- vector/raster type
-- production-safe flag
-- license metadata
+Vibe packs may combine fonts + stickers + layout suggestions.
+
+Every asset remains versioned, production-safe and licensed.
 
 ## Selection and transforms
 
 Selected object exposes:
-- bounding box
-- resize handles
-- rotation handle
+- visual bounding box
+- large resize handles
+- rotate handle
+- compact contextual toolbar
 - delete
 - duplicate
-- lock/unlock optional
-- physical width/height
+- optional exact size
 
 Rules:
 - preserve aspect ratio by default for images/stickers;
-- allow explicit unlock only if product decision supports distortion;
-- snapping to horizontal center and useful anchors;
-- subtle haptic/visual feedback on snap where platform supports;
-- prevent silent movement beyond hard forbidden boundaries where possible.
+- snap to center/anchors with subtle feedback;
+- do not fight the user's drag gesture;
+- invalid placement is shown clearly through Design check.
 
 ## Measurements
 
-Show human-readable real dimensions:
-- Width: 24.7 cm
-- Height: 29.3 cm
+Default customer display:
+- 24.7 × 29.3 cm
 
-Advanced/internal coordinates stay hidden.
+Do not show raw coordinates.
 
-Useful placement hints:
-- centered
+Exact size belongs to secondary/advanced UI.
+
+Useful hints:
+- Centered
+- Small chest
 - 8.5 cm below collar
-- left chest
-- near print limit
+- Close to print edge
 
-## Preflight UX
+## Design check UX
 
-Persistent compact indicator:
-- green: Ready
-- amber: Check
-- red: Fix required
+Customer-facing states:
+- Looks ready
+- Worth checking
+- Needs a fix
 
-Issue format:
-- what is wrong;
-- which element;
+Each issue includes:
+- plain-language explanation;
+- affected object;
 - why it matters;
-- how to fix it;
-- one-click focus/select element.
+- direct action.
 
-Example:
-“Image quality is low at this size — 118 DPI. Reduce print size to improve quality.”
+Examples:
+- “This image may print blurry at this size.”
+- “Part of your design is outside the printable area.”
+- “Move this a little higher.”
 
-Avoid technical codes in primary customer UI; keep codes for diagnostics.
+One tap focuses the affected object.
+
+Technical codes remain in diagnostics.
 
 ## Product/size changes
 
-Changing:
-- size
-- model
-- color
-- side profile
-
-must preview consequences before commit if design validity changes.
-
-Example dialog:
-“Size S has a smaller printable area. Your current design will no longer fit.”
+If a change invalidates design:
+- preview impact first;
+- do not silently rescale;
+- preserve original revision.
 
 Actions:
-- Keep current size
-- Switch and auto-fit copy
-- Switch and edit manually
+- Keep current
+- Switch and edit
+- Create fitted copy
 
-Auto-fit must create a new draft revision and be explicit.
+“Create fitted copy” is a new draft and remains fully editable.
 
 ## Front/back
 
-Prevent ambiguity:
-- prominent FRONT / BACK segmented control;
-- garment orientation label inside viewport;
-- layer list scoped by side;
-- mini thumbnail previews for both sides;
-- cart/order summary shows both.
+Use:
+- prominent FRONT / BACK control;
+- visual mini thumbnails;
+- swipe between sides in Final preview;
+- side-specific layer list;
+- clear side label in editor.
+
+No automatic mirroring.
+
+## Remix
+
+Remix is a first-class creation action.
+
+It always:
+- clones to a new draft;
+- preserves original;
+- can target another garment/color/size;
+- triggers fresh validation.
 
 ## Undo/redo
 
-Command history should include:
+Command history includes:
 - add/remove
 - move
 - resize
@@ -162,48 +210,63 @@ Command history should include:
 - crop
 - text change
 - layer reorder
+- placement preset
 
-Product variant changes should not be casually mixed into object undo history.
+Variant changes are outside casual object-history semantics.
 
 ## Autosave
 
-UI states:
+States:
 - Saving…
 - Saved
 - Offline / unsaved
 - Conflict detected
 
-Never imply “Saved” until mock persistence layer has acknowledged the revision.
+Saving feedback should stay quiet unless there is a problem.
 
-## Proof review
+## Final preview
 
-Proof is not just another editor screen.
+Final preview is a reveal moment and a serious approval artifact.
 
-Proof page:
-- no transform handles;
-- exact product/size/color;
-- FRONT/BACK views;
-- physical dimensions;
-- warnings accepted;
-- proof revision/version;
-- CTA: Approve design.
+Use:
+- large/full-screen garment presentation;
+- FRONT/BACK swipe or segmented control;
+- clean design with editor chrome removed;
+- product/color/size;
+- physical print size in details;
+- Design check summary;
+- Edit;
+- Approve design.
 
-If customer edits after viewing proof, previous proof becomes obsolete.
+Any edit makes that Final preview obsolete.
+
+## Share preview
+
+Optional share-preview:
+- uses non-production mockup;
+- no editor chrome;
+- share link/image;
+- private by default;
+- original upload never exposed automatically.
+
+Share preview is not the approved production proof.
 
 ## Error recovery
 
-For network/mock failures:
+For failures:
 - preserve local draft;
 - offer retry;
-- never clear editor state on failed save;
-- show conflict resolution if remote version advanced.
+- never clear canvas;
+- conflict resolution is explicit;
+- stale Final preview cannot be approved.
 
 ## Accessibility
 
 - keyboard operability on desktop;
 - visible focus states;
-- text alternatives for controls;
-- color is never the only status signal;
-- minimum target 44×44 where touch;
-- warnings readable by screen readers;
-- zoom does not break layout.
+- non-color status cues;
+- touch targets >=44px;
+- screen-reader labels;
+- reduced motion support;
+- zoom-safe layout;
+- direct manipulation has numeric/keyboard alternatives where practical.
