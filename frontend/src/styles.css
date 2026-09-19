@@ -122,3 +122,11 @@ main{max-width:1440px;margin:0 auto}.hero{min-height:680px;display:grid;grid-tem
   .canvas-zoom{top:10px;right:10px}
   .garment-color-picker{margin-top:8px}
 }
+
+.variant-size-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #36383e}
+.variant-size-chips{display:flex;gap:6px;flex-wrap:wrap}
+.variant-size-chips button{min-width:36px;height:34px;border-radius:10px;border:1px solid #484a52;background:#24252a;color:#fff}
+.variant-size-chips button.active{background:#fff;color:#111;border-color:#fff}
+.bottom-sheet .variant-size-row{border-top-color:var(--border)}
+.bottom-sheet .variant-size-chips button{background:#f7f7f8;color:#111;border-color:var(--border)}
+.bottom-sheet .variant-size-chips button.active{background:#111214;color:#fff;border-color:#111214}
