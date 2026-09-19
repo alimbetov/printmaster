@@ -14,14 +14,18 @@ Frontend-first product and UX design for the mock-driven MVP.
 8. [Deep Frontend Architecture Review](./frontend-architecture-review.md)
 9. [Frontend Coordinate System](./frontend-coordinate-system.md)
 10. [Editor Interaction State Machine](./editor-interaction-state-machine.md)
+11. [Gen Alpha Product & Visual Vision](./gen-alpha-product-vision.md)
 
 ## Design principles
 
 - Production geometry is modeled in millimeters even before the backend exists.
 - Browser pixels are presentation only.
-- Desktop, tablet and mobile share one product model but use different layout patterns.
-- The editor exposes physical constraints without forcing customers to understand DTF terminology.
-- Proof is a distinct read-only artifact rendered independently from the interactive viewport.
+- Creation-first is the primary experience; shop-first remains available.
+- Mobile is a first-class creation surface, not compressed desktop.
+- The editor feels like a creative playground while production constraints remain strict underneath.
+- Proof is presented to customers as a distinct read-only Final preview.
 - Mock APIs simulate future backend contracts, concurrency and failure states.
-- Accessibility and touch behavior are part of MVP design, not a later patch.
-- Approved/stale states are explicit; no silent resizing or overwrite is allowed.
+- Accessibility and touch behavior are part of MVP design.
+- Approved/stale states are explicit; no silent resizing or overwrite.
+- Sharing/remixing is designed as creation, not purchase pressure.
+- Privacy is the default for uploaded artwork and share previews.
