@@ -124,10 +124,15 @@ export const fontCatalog = [
   { id: 'trebuchet', name: 'Trebuchet', family: '"Trebuchet MS", sans-serif', category: 'Friendly' }
 ] as const
 
-export const createDraft = (productId = 'hoodie-basic'): Draft => ({
+export const createDraft = (productId = 'hoodie-basic'): Draft => {
+  const product = products.find(item => item.id === productId) ?? products[0]
+  const profile = printProfiles[productId] ?? printProfiles['tee-basic']
+  const zone = profile.front
+
+  return {
   id: 'draft-demo',
   productId,
-  color: 'black',
+  color: product.colors[0].code,
   size: 'L',
   activeSide: 'FRONT',
   status: 'READY',
@@ -137,8 +142,8 @@ export const createDraft = (productId = 'hoodie-basic'): Draft => ({
       type: 'TEXT',
       label: 'ALMATY',
       side: 'FRONT',
-      xMm: productId === 'hoodie-basic' ? 310 : 290,
-      yMm: 255,
+      xMm: zone.xMm + zone.widthMm / 2,
+      yMm: zone.yMm + zone.heightMm * .35,
       widthMm: 150,
       heightMm: 42,
       rotationDeg: 0,
@@ -151,7 +156,8 @@ export const createDraft = (productId = 'hoodie-basic'): Draft => ({
       letterSpacingMm: 0
     }
   ]
-})
+  }
+}
 
 const rotatedHalfExtents = (widthMm: number, heightMm: number, rotationDeg: number) => {
   const radians = rotationDeg * Math.PI / 180
