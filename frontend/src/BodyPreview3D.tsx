@@ -141,6 +141,7 @@ export default function BodyPreview3D({
   const [preset, setPreset] = useState<BodyPreset>('STRAIGHT')
   const [shape, setShape] = useState<BodyShape>(presets.STRAIGHT)
   const [dragPreview, setDragPreview] = useState<PlacementFrameNormalized | null>(null)
+  const dragPreviewRef = useRef<PlacementFrameNormalized | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{
     startClientX: number
@@ -156,6 +157,7 @@ export default function BodyPreview3D({
 
   useEffect(() => {
     setDragPreview(null)
+    dragPreviewRef.current = null
     dragRef.current = null
   }, [draft.activeSide, draft.productId, draft.size])
 
@@ -172,15 +174,17 @@ export default function BodyPreview3D({
       const dxNormalized = dxBodyPct / BODY_PRINT_ENVELOPE.widthPct
       const dyNormalized = dyBodyPct / BODY_PRINT_ENVELOPE.heightPct
 
-      setDragPreview(normalizePlacementFrame({
+      const preview = normalizePlacementFrame({
         ...drag.startFrame,
         x: drag.startFrame.x + dxNormalized,
         y: drag.startFrame.y + dyNormalized
-      }))
+      })
+      dragPreviewRef.current = preview
+      setDragPreview(preview)
     }
 
     const up = () => {
-      const preview = dragPreview
+      const preview = dragPreviewRef.current
       if (dragRef.current && preview) {
         onChange(movePlacementFrameWithDesign(
           draft,
@@ -190,6 +194,7 @@ export default function BodyPreview3D({
         ))
       }
       dragRef.current = null
+      dragPreviewRef.current = null
       setDragPreview(null)
     }
 
@@ -199,7 +204,7 @@ export default function BodyPreview3D({
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
     }
-  }, [dragPreview, draft, onChange, zone])
+  }, [draft, onChange, zone])
 
   const applyPreset = (next: BodyPreset) => {
     setPreset(next)
@@ -305,6 +310,7 @@ export default function BodyPreview3D({
                 startClientY: event.clientY,
                 startFrame: canonicalFrame
               }
+              dragPreviewRef.current = canonicalFrame
               setDragPreview(canonicalFrame)
             }}
           >
