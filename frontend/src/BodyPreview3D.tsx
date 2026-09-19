@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Draft, DesignElement } from './types'
 import { getPrintProfile } from './mock'
@@ -117,6 +117,43 @@ export default function BodyPreview3D({
 }) {
   const [preset, setPreset] = useState<BodyPreset>('STRAIGHT')
   const [shape, setShape] = useState<BodyShape>(presets.STRAIGHT)
+  const [frame, setFrame] = useState({ x: 23, y: 20, width: 54, height: 56 })
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{
+    startClientX: number
+    startClientY: number
+    startX: number
+    startY: number
+  } | null>(null)
+
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      const drag = dragRef.current
+      const body = bodyRef.current
+      if (!drag || !body) return
+
+      const rect = body.getBoundingClientRect()
+      const dxPct = ((event.clientX - drag.startClientX) / rect.width) * 100
+      const dyPct = ((event.clientY - drag.startClientY) / rect.height) * 100
+
+      setFrame(current => ({
+        ...current,
+        x: clamp(drag.startX + dxPct, 4, 96 - current.width),
+        y: clamp(drag.startY + dyPct, 6, 96 - current.height)
+      }))
+    }
+
+    const up = () => {
+      dragRef.current = null
+    }
+
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+  }, [])
 
   const applyPreset = (next: BodyPreset) => {
     setPreset(next)
@@ -155,6 +192,7 @@ export default function BodyPreview3D({
     <div className="body-stage">
       <div className="body-perspective">
         <div
+          ref={bodyRef}
           className="body-model"
           style={{
             transform: `rotateY(${shape.yaw}deg)`,
@@ -170,7 +208,40 @@ export default function BodyPreview3D({
           }}
         >
           <div className="body-neck"/>
-          <div className="body-print-surface">
+
+          <div
+            className="body-relief-frame"
+            style={{
+              left: `${frame.x}%`,
+              top: `${frame.y}%`,
+              width: `${frame.width}%`,
+              height: `${frame.height}%`
+            }}
+            onPointerDown={event => {
+              event.preventDefault()
+              dragRef.current = {
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+                startX: frame.x,
+                startY: frame.y
+              }
+            }}
+          >
+            <span className="body-relief-label">BODY RELIEF FRAME</span>
+            <i className="relief-line relief-chest">Chest</i>
+            <i className="relief-line relief-waist">Waist</i>
+            <i className="relief-line relief-abdomen">Abdomen</i>
+          </div>
+
+          <div
+            className="body-print-surface"
+            style={{
+              left: `${frame.x}%`,
+              top: `${frame.y}%`,
+              width: `${frame.width}%`,
+              height: `${frame.height}%`
+            }}
+          >
             {activeElements.map(element =>
               <RenderBodyElement
                 key={element.id}
@@ -227,6 +298,48 @@ export default function BodyPreview3D({
           />
         </label>
       )}
+
+      <div className="body-control-section body-frame-controls">
+        <b>Body relief frame</b>
+        <small>Drag the frame directly on the body. It changes body mapping only, not the production print zone.</small>
+
+        <label className="body-slider">
+          <span><b>Frame width</b><i>{Math.round(frame.width)}%</i></span>
+          <input
+            type="range"
+            min="35"
+            max="72"
+            value={frame.width}
+            onChange={event => setFrame(current => ({
+              ...current,
+              width: Number(event.target.value),
+              x: clamp(current.x, 4, 96 - Number(event.target.value))
+            }))}
+          />
+        </label>
+
+        <label className="body-slider">
+          <span><b>Frame height</b><i>{Math.round(frame.height)}%</i></span>
+          <input
+            type="range"
+            min="38"
+            max="72"
+            value={frame.height}
+            onChange={event => setFrame(current => ({
+              ...current,
+              height: Number(event.target.value),
+              y: clamp(current.y, 6, 96 - Number(event.target.value))
+            }))}
+          />
+        </label>
+
+        <button
+          className="body-reset"
+          onClick={() => setFrame({ x: 23, y: 20, width: 54, height: 56 })}
+        >
+          Reset relief frame
+        </button>
+      </div>
 
       <label className="body-slider">
         <span><b>Rotate body</b><i>{shape.yaw}°</i></span>
