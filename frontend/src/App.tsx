@@ -23,7 +23,11 @@ import {
   readStoredJson
 } from './mock'
 import i18n from './i18n'
-import { normalizePlacementFrame } from './placement'
+import {
+  frameToMm,
+  getFrameForSide,
+  normalizePlacementFrame
+} from './placement'
 
 const LOCAL_IMAGE_BUDGET_CHARS = 1_500_000
 
@@ -309,6 +313,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   }
 
   const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const placementFrame = getFrameForSide(draft, draft.activeSide)
+  const placementMm = frameToMm(placementFrame, zone)
   const maxZ = Math.max(0, ...draft.elements.map(element => element.zOrder))
 
   const addText = () => {
@@ -320,9 +326,9 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         type: 'TEXT',
         label: 'YOUR TEXT',
         side: draft.activeSide,
-        xMm: zone.xMm + zone.widthMm / 2,
-        yMm: zone.yMm + zone.heightMm / 2,
-        widthMm: Math.min(150, zone.widthMm * .72),
+        xMm: placementMm.xMm + placementMm.widthMm / 2,
+        yMm: placementMm.yMm + placementMm.heightMm / 2,
+        widthMm: Math.min(150, placementMm.widthMm * .72),
         heightMm: 42,
         rotationDeg: 0,
         zOrder: maxZ + 1,
@@ -348,8 +354,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         type: 'STICKER',
         label: '★',
         side: draft.activeSide,
-        xMm: zone.xMm + zone.widthMm / 2,
-        yMm: zone.yMm + zone.heightMm / 2,
+        xMm: placementMm.xMm + placementMm.widthMm / 2,
+        yMm: placementMm.yMm + placementMm.heightMm / 2,
         widthMm: 70,
         heightMm: 70,
         rotationDeg: 0,
@@ -389,8 +395,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       const image = new Image()
       image.onload = () => {
         const id = crypto.randomUUID()
-        const maxWidthMm = Math.min(150, zone.widthMm * .7)
-        const maxHeightMm = zone.heightMm * .7
+        const maxWidthMm = Math.min(150, placementMm.widthMm * .7)
+        const maxHeightMm = placementMm.heightMm * .7
         const sourceWidth = Math.max(image.naturalWidth, 1)
         const sourceHeight = Math.max(image.naturalHeight, 1)
         const fitScale = Math.min(
@@ -407,8 +413,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
             type: 'IMAGE',
             label: file.name,
             side: draft.activeSide,
-            xMm: zone.xMm + zone.widthMm / 2,
-            yMm: zone.yMm + zone.heightMm / 2,
+            xMm: placementMm.xMm + placementMm.widthMm / 2,
+            yMm: placementMm.yMm + placementMm.heightMm / 2,
             widthMm,
             heightMm,
             rotationDeg: 0,
@@ -454,8 +460,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const centerSelected = () => {
     if (!selected) return
     updateElement(selected.id, {
-      xMm: zone.xMm + zone.widthMm / 2,
-      yMm: zone.yMm + zone.heightMm / 2
+      xMm: placementMm.xMm + placementMm.widthMm / 2,
+      yMm: placementMm.yMm + placementMm.heightMm / 2
     })
   }
 
@@ -593,8 +599,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         <EditorInspector
           selected={selected}
           zoneCenter={{
-            xMm: zone.xMm + zone.widthMm / 2,
-            yMm: zone.yMm + zone.heightMm / 2
+            xMm: placementMm.xMm + placementMm.widthMm / 2,
+            yMm: placementMm.yMm + placementMm.heightMm / 2
           }}
           onUpdate={patch => selected && updateElement(selected.id, patch)}
           onDelete={removeSelected}
