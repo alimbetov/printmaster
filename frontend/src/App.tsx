@@ -16,8 +16,8 @@ import {
   formatKzt,
   getDraftStatus,
   getPreflightIssues,
+  getPrintProfile,
   getSidesInUse,
-  printProfiles,
   products,
   readStoredJson
 } from './mock'
@@ -210,7 +210,7 @@ function ProductPage({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft)
   const chosen = product.colors.find(item => item.code === color) ?? product.colors[0]
 
   const customize = () => {
-    onDraft({ ...createDraft(product.id), color, size })
+    onDraft({ ...createDraft(product.id, size), color })
     navigate('/editor')
   }
 
@@ -267,7 +267,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const navigate = useNavigate()
   const product = products.find(item => item.id === draft.productId) ?? products[1]
   const garmentColor = product.colors.find(item => item.code === draft.color)?.hex ?? '#171717'
-  const profile = printProfiles[draft.productId] ?? printProfiles['hoodie-basic']
+  const profile = getPrintProfile(draft.productId, draft.size)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
   const [zoom, setZoom] = useState(1)
