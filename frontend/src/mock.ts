@@ -10,25 +10,79 @@ import type {
 export const products: Product[] = [
   {
     id: 'tee-basic',
-    name: 'Basic Tee',
+    name: 'Everyday Tee',
+    collection: 'Core',
     type: 'TSHIRT',
+    fit: 'REGULAR',
     descriptionKey: 'product.teeDescription',
+    material: '100% cotton',
+    gsm: 190,
     price: 6900,
     colors: [
       { code: 'black', name: 'Black', hex: '#171717' },
-      { code: 'white', name: 'White', hex: '#f4f4f2' }
+      { code: 'white', name: 'White', hex: '#f4f4f2' },
+      { code: 'graphite', name: 'Graphite', hex: '#4b4d51' },
+      { code: 'navy', name: 'Navy', hex: '#17243f' },
+      { code: 'forest', name: 'Forest', hex: '#29483a' },
+      { code: 'sand', name: 'Sand', hex: '#d4c4a8' }
+    ],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  {
+    id: 'tee-heavy',
+    name: 'Heavy Oversize Tee',
+    collection: 'Street',
+    type: 'TSHIRT',
+    fit: 'OVERSIZE',
+    descriptionKey: 'product.teeDescription',
+    material: '100% heavyweight cotton',
+    gsm: 260,
+    price: 8900,
+    colors: [
+      { code: 'washed-black', name: 'Washed Black', hex: '#292827' },
+      { code: 'bone', name: 'Bone', hex: '#e5dfd3' },
+      { code: 'burgundy', name: 'Burgundy', hex: '#642f3b' },
+      { code: 'sage', name: 'Sage', hex: '#899580' },
+      { code: 'cobalt', name: 'Cobalt', hex: '#244c9c' }
     ],
     sizes: ['S', 'M', 'L', 'XL']
   },
   {
     id: 'hoodie-basic',
-    name: 'Basic Hoodie',
+    name: 'Core Hoodie',
+    collection: 'Core',
     type: 'HOODIE',
+    fit: 'RELAXED',
     descriptionKey: 'product.hoodieDescription',
+    material: 'Cotton blend fleece',
+    gsm: 330,
     price: 12900,
     colors: [
       { code: 'black', name: 'Black', hex: '#171717' },
-      { code: 'white', name: 'White', hex: '#f4f4f2' }
+      { code: 'white', name: 'White', hex: '#f4f4f2' },
+      { code: 'heather', name: 'Heather Grey', hex: '#a7a7a3' },
+      { code: 'navy', name: 'Navy', hex: '#17243f' },
+      { code: 'chocolate', name: 'Chocolate', hex: '#584235' },
+      { code: 'olive', name: 'Olive', hex: '#596047' }
+    ],
+    sizes: ['S', 'M', 'L', 'XL']
+  },
+  {
+    id: 'hoodie-heavy',
+    name: 'Heavy Oversize Hoodie',
+    collection: 'Street',
+    type: 'HOODIE',
+    fit: 'OVERSIZE',
+    descriptionKey: 'product.hoodieDescription',
+    material: 'Heavy brushed cotton blend',
+    gsm: 430,
+    price: 15900,
+    colors: [
+      { code: 'washed-black', name: 'Washed Black', hex: '#292827' },
+      { code: 'cream', name: 'Cream', hex: '#e7dcc8' },
+      { code: 'dusty-pink', name: 'Dusty Pink', hex: '#c79ca2' },
+      { code: 'deep-green', name: 'Deep Green', hex: '#21473a' },
+      { code: 'plum', name: 'Plum', hex: '#54334e' }
     ],
     sizes: ['S', 'M', 'L', 'XL']
   }
@@ -46,6 +100,18 @@ export const printProfiles: Record<string, MockPrintProfile> = {
     garmentHeightMm: 760,
     front: { xMm: 185, yMm: 165, widthMm: 250, heightMm: 300 },
     back: { xMm: 160, yMm: 145, widthMm: 300, heightMm: 390 }
+  },
+  'tee-heavy': {
+    garmentWidthMm: 640,
+    garmentHeightMm: 740,
+    front: { xMm: 185, yMm: 145, widthMm: 270, heightMm: 320 },
+    back: { xMm: 165, yMm: 125, widthMm: 310, heightMm: 390 }
+  },
+  'hoodie-heavy': {
+    garmentWidthMm: 690,
+    garmentHeightMm: 790,
+    front: { xMm: 215, yMm: 170, widthMm: 260, heightMm: 315 },
+    back: { xMm: 185, yMm: 145, widthMm: 320, heightMm: 405 }
   }
 }
 
@@ -68,7 +134,12 @@ export const createDraft = (productId = 'hoodie-basic'): Draft => ({
       heightMm: 42,
       rotationDeg: 0,
       zOrder: 1,
-      fill: '#ffffff'
+      fill: '#ffffff',
+      fontFamily: 'Inter',
+      fontStyle: 'normal',
+      fontWeight: 800,
+      textAlign: 'center',
+      letterSpacingMm: 0
     }
   ]
 })
