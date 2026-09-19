@@ -306,3 +306,30 @@ Development controls must support:
 - inventory invalidation.
 
 This is part of UX testing, not merely backend simulation.
+
+## Localization contract
+
+Mock API responses should remain locale-neutral for domain data.
+
+Do not return pretranslated production/preflight messages where a structured code can be returned.
+
+Example:
+
+```ts
+type LocalizableIssue = {
+  code: string;
+  severity: 'BLOCKER' | 'WARNING' | 'INFO';
+  elementId?: string;
+  params?: Record<string, string | number | boolean>;
+};
+```
+
+Frontend translation layer maps `code + params` into active locale.
+
+Mock user/profile state may expose:
+
+```ts
+type UserPreferences = {
+  locale: 'kk-KZ' | 'ru-KZ' | 'en-US';
+};
+```
