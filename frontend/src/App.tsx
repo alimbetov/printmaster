@@ -333,13 +333,14 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     const reader = new FileReader()
     reader.onload = () => {
       if (typeof reader.result !== 'string') return
+      const dataUrl = reader.result
 
       const existingImageChars = draft.elements.reduce(
         (sum, element) => sum + (element.imageDataUrl?.length ?? 0),
         0
       )
 
-      if (existingImageChars + reader.result.length > LOCAL_IMAGE_BUDGET_CHARS) {
+      if (existingImageChars + dataUrl.length > LOCAL_IMAGE_BUDGET_CHARS) {
         alert('The local mock editor has reached its temporary image-storage limit. Remove another image or use a smaller file.')
         return
       }
@@ -371,7 +372,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
             heightMm,
             rotationDeg: 0,
             zOrder: maxZ + 1,
-            imageDataUrl: reader.result,
+            imageDataUrl: dataUrl,
             sourceWidthPx: image.naturalWidth,
             sourceHeightPx: image.naturalHeight
           }]
@@ -379,7 +380,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         setSelectedId(id)
         setSheet('STYLE')
       }
-      image.src = reader.result
+      image.src = dataUrl
     }
     reader.readAsDataURL(file)
   }
