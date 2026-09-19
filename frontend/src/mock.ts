@@ -3,10 +3,12 @@ import type {
   DraftStatus,
   MockPrintProfile,
   PreflightIssue,
+  PlacementFrameNormalized,
   Product,
   Side,
   Size
 } from './types'
+import { frameToMm, getFrameForSide } from './placement'
 
 export const products: Product[] = [
   {
@@ -141,6 +143,23 @@ export const getPrintProfile = (productId: string, size: Size): MockPrintProfile
   }
 }
 
+export const defaultPlacementFrame = (): PlacementFrameNormalized => ({
+  x: .08,
+  y: .08,
+  width: .84,
+  height: .84
+})
+
+export const placementFrameToZoneMm = (
+  frame: PlacementFrameNormalized,
+  zone: MockPrintProfile['front']
+) => ({
+  xMm: zone.xMm + frame.x * zone.widthMm,
+  yMm: zone.yMm + frame.y * zone.heightMm,
+  widthMm: frame.width * zone.widthMm,
+  heightMm: frame.height * zone.heightMm
+})
+
 export const fontCatalog = [
   { id: 'inter', name: 'Inter', family: 'Inter, Arial, sans-serif', category: 'Clean' },
   { id: 'arial', name: 'Arial', family: 'Arial, sans-serif', category: 'Clean' },
@@ -161,6 +180,10 @@ export const createDraft = (productId = 'hoodie-basic', size: Size = 'L'): Draft
   color: product.colors[0].code,
   size,
   activeSide: 'FRONT',
+  placementFrames: {
+    FRONT: defaultPlacementFrame(),
+    BACK: defaultPlacementFrame()
+  },
   status: 'READY',
   elements: [
     {
@@ -201,6 +224,7 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
   for (const element of draft.elements) {
     const zone = element.side === 'FRONT' ? profile.front : profile.back
     const half = rotatedHalfExtents(element.widthMm, element.heightMm, element.rotationDeg)
+    const placement = frameToMm(getFrameForSide(draft, element.side), zone)
 
     const left = element.xMm - half.x
     const right = element.xMm + half.x
@@ -216,6 +240,19 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
       issues.push({
         code: 'OUTSIDE_PRINT_AREA',
         severity: 'BLOCKER',
+        elementId: element.id
+      })
+    }
+
+    if (
+      left < placement.xMm ||
+      right > placement.xMm + placement.widthMm ||
+      top < placement.yMm ||
+      bottom > placement.yMm + placement.heightMm
+    ) {
+      issues.push({
+        code: 'OUTSIDE_PLACEMENT_FRAME',
+        severity: 'WARNING',
         elementId: element.id
       })
     }
