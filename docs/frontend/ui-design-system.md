@@ -447,3 +447,21 @@ shadow.*
 ```
 
 Do not reference raw hex values in feature components.
+
+## 26. Localization behavior
+
+The design system must support:
+- `kk-KZ`;
+- `ru-KZ`;
+- `en-US`.
+
+Rules:
+- do not use fixed widths for text-heavy controls;
+- expect translated text expansion;
+- bottom-dock labels must fit all MVP locales;
+- semantic tokens are language-independent;
+- prefer CSS logical properties where direction-neutral;
+- typography must support Kazakh Cyrillic glyphs;
+- customer-facing strings come from i18n resources, never feature components.
+
+Development should include pseudo-localization to expose clipping and hardcoded strings.
