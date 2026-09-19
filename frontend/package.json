@@ -1,7 +1,7 @@
 {
   "name": "printmaster-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "i18next": "^25.5.2",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
+    "konva": "^10.5.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "react-i18next": "^15.7.3",
+    "react-konva": "^19.3.0",
     "react-router-dom": "^7.9.1"
   },
   "devDependencies": {
