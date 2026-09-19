@@ -4,7 +4,8 @@ import type {
   MockPrintProfile,
   PreflightIssue,
   Product,
-  Side
+  Side,
+  Size
 } from './types'
 
 export const products: Product[] = [
@@ -115,6 +116,31 @@ export const printProfiles: Record<string, MockPrintProfile> = {
   }
 }
 
+const sizeProfileScale: Record<Size, number> = {
+  S: .92,
+  M: .96,
+  L: 1,
+  XL: 1.05
+}
+
+export const getPrintProfile = (productId: string, size: Size): MockPrintProfile => {
+  const base = printProfiles[productId] ?? printProfiles['hoodie-basic']
+  const scale = sizeProfileScale[size] ?? 1
+  const scaleZone = (zone: MockPrintProfile['front']) => ({
+    xMm: zone.xMm * scale,
+    yMm: zone.yMm * scale,
+    widthMm: zone.widthMm * scale,
+    heightMm: zone.heightMm * scale
+  })
+
+  return {
+    garmentWidthMm: base.garmentWidthMm * scale,
+    garmentHeightMm: base.garmentHeightMm * scale,
+    front: scaleZone(base.front),
+    back: scaleZone(base.back)
+  }
+}
+
 export const fontCatalog = [
   { id: 'inter', name: 'Inter', family: 'Inter, Arial, sans-serif', category: 'Clean' },
   { id: 'arial', name: 'Arial', family: 'Arial, sans-serif', category: 'Clean' },
@@ -126,7 +152,7 @@ export const fontCatalog = [
 
 export const createDraft = (productId = 'hoodie-basic'): Draft => {
   const product = products.find(item => item.id === productId) ?? products[0]
-  const profile = printProfiles[productId] ?? printProfiles['tee-basic']
+  const profile = getPrintProfile(productId, 'L')
   const zone = profile.front
 
   return {
@@ -168,7 +194,7 @@ const rotatedHalfExtents = (widthMm: number, heightMm: number, rotationDeg: numb
 }
 
 export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
-  const profile = printProfiles[draft.productId] ?? printProfiles['hoodie-basic']
+  const profile = getPrintProfile(draft.productId, draft.size)
   const issues: PreflightIssue[] = []
 
   for (const element of draft.elements) {
