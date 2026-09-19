@@ -23,11 +23,23 @@ import {
   readStoredJson
 } from './mock'
 import i18n from './i18n'
+import { normalizePlacementFrame } from './placement'
 
 const LOCAL_IMAGE_BUDGET_CHARS = 1_500_000
 
 const normalizeDraft = (draft: Draft): Draft => {
-  const next = { ...draft, elements: draft.elements.map(element => ({ ...element })) }
+  const legacy = draft as Draft & {
+    placementFrames?: Draft['placementFrames']
+  }
+
+  const next: Draft = {
+    ...draft,
+    placementFrames: {
+      FRONT: normalizePlacementFrame(legacy.placementFrames?.FRONT),
+      BACK: normalizePlacementFrame(legacy.placementFrames?.BACK)
+    },
+    elements: draft.elements.map(element => ({ ...element }))
+  }
 
   for (const side of ['FRONT', 'BACK'] as Side[]) {
     const ordered = next.elements
@@ -556,6 +568,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         </> : <BodyPreview3D
           draft={draft}
           garmentColor={garmentColor}
+          onChange={commit}
         />}
       </section>
 
