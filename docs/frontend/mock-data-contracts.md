@@ -4,17 +4,38 @@
 
 Mock APIs must look like future backend APIs. Pages/components must not import fixture JSON directly.
 
+The mock layer is a contract simulator, not a bag of fixtures.
+
 ## Core identifiers
 
-Use opaque string IDs in mocks:
+Use opaque string IDs:
 - productId
 - variantId
 - printProfileVersionId
 - designId
 - designRevisionId
 - assetId
+- preflightReportId
 - proofId
+- proofApprovalId
 - orderId
+
+## Shared geometry
+
+```ts
+type PointMm = { xMm: number; yMm: number };
+type PolygonMm = { points: PointMm[] };
+
+type CoordinateSystem = {
+  units: 'MM';
+  origin: 'TOP_LEFT';
+  xAxis: 'RIGHT';
+  yAxis: 'DOWN';
+  rotationDirection: 'CLOCKWISE';
+};
+```
+
+All persisted design geometry uses garment-space millimeters.
 
 ## Product
 
@@ -40,11 +61,14 @@ type ProductVariant = {
   mockup: {
     frontUrl: string;
     backUrl: string;
+    projectionVersion: string;
   };
   printProfileVersionId: string;
   available: boolean;
 };
 ```
+
+Mockup image dimensions never define physical geometry.
 
 ## Print profile
 
@@ -52,6 +76,7 @@ type ProductVariant = {
 type PrintProfile = {
   id: string;
   version: number;
+  coordinateSystem: CoordinateSystem;
   garment: {
     widthMm: number;
     heightMm: number;
@@ -59,20 +84,30 @@ type PrintProfile = {
   sides: Record<'FRONT' | 'BACK', {
     printable: PolygonMm;
     safe?: PolygonMm;
-    forbidden: Array<{ id: string; reason: string; polygon: PolygonMm }>;
-    anchors: Array<{ id: string; xMm: number; yMm: number }>;
+    forbidden: Array<{
+      id: string;
+      reason: string;
+      polygon: PolygonMm;
+    }>;
+    anchors: Array<{
+      id: string;
+      xMm: number;
+      yMm: number;
+    }>;
   }>;
 };
 ```
 
 ## Design element
 
-```ts
-type DesignElement =
-  | ImageElement
-  | TextElement
-  | StickerElement;
+Persisted element semantics:
+- xMm/yMm = element center in garment-space;
+- widthMm/heightMm = unrotated physical dimensions;
+- rotationDeg = clockwise in [0, 360);
+- crop coordinates are normalized to source asset space;
+- zOrder is unique within a side.
 
+```ts
 type BaseElement = {
   id: string;
   side: 'FRONT' | 'BACK';
@@ -83,25 +118,87 @@ type BaseElement = {
   rotationDeg: number;
   zOrder: number;
 };
-```
 
-Crop for images is stored normalized to source asset, not viewport pixels.
+type ImageElement = BaseElement & {
+  type: 'IMAGE';
+  assetId: string;
+  crop?: { x: number; y: number; width: number; height: number };
+};
+
+type TextElement = BaseElement & {
+  type: 'TEXT';
+  text: string;
+  fontId: string;
+  fontVersion: string;
+  color: string;
+  align: 'LEFT' | 'CENTER' | 'RIGHT';
+};
+
+type StickerElement = BaseElement & {
+  type: 'STICKER';
+  stickerId: string;
+  stickerVersion: string;
+};
+
+type DesignElement = ImageElement | TextElement | StickerElement;
+```
 
 ## Design revision
 
+Use the full domain lifecycle in contracts; UI may show simpler labels.
+
 ```ts
+type DesignStatus =
+  | 'DRAFT'
+  | 'VALIDATING'
+  | 'INVALID'
+  | 'VALID'
+  | 'PROOF_RENDERING'
+  | 'PROOF_FAILED'
+  | 'PROOF_READY'
+  | 'APPROVED'
+  | 'LOCKED'
+  | 'ARCHIVED';
+
 type DesignRevision = {
   id: string;
   designId: string;
   revision: number;
   variantId: string;
   printProfileVersionId: string;
-  status: 'DRAFT' | 'VALID' | 'PROOF_READY' | 'APPROVED';
+  status: DesignStatus;
   elements: DesignElement[];
   version: number;
+  contentHash: string;
   updatedAt: string;
 };
 ```
+
+## Draft save contract
+
+```ts
+type SaveDraftRequest = {
+  expectedVersion: number;
+  elements: DesignElement[];
+  clientMutationId: string;
+};
+
+type SaveDraftSuccess = {
+  revision: DesignRevision;
+};
+
+type SaveDraftConflict = {
+  status: 409;
+  latestVersion: number;
+  latestRevisionId: string;
+  latestUpdatedAt: string;
+};
+```
+
+Rules:
+- only one save mutation in flight per design;
+- late responses cannot overwrite a newer local mutation;
+- 409 never silently replaces local work.
 
 ## Preflight
 
@@ -116,26 +213,60 @@ type PreflightIssue = {
 };
 
 type PreflightReport = {
-  revisionId: string;
+  id: string;
+  designRevisionId: string;
+  evaluatedRevisionVersion: number;
+  evaluatedContentHash: string;
+  printProfileVersionId: string;
+  validatorVersion: string;
   status: 'PASS' | 'WARNING' | 'BLOCKED';
   issues: PreflightIssue[];
+  generatedAt: string;
 };
 ```
 
+Any canonical design mutation makes an older preflight report stale.
+
 ## Proof
+
+Proof is produced by a read-only proof renderer, not by screenshotting the editor viewport.
 
 ```ts
 type Proof = {
   id: string;
+  status: 'RENDERING' | 'READY' | 'FAILED' | 'OBSOLETE';
   designRevisionId: string;
+  designContentHash: string;
   printProfileVersionId: string;
+  preflightReportId: string;
+  preflightHash: string;
   rendererVersion: string;
   frontPreviewUrl?: string;
   backPreviewUrl?: string;
-  hash: string;
-  warnings: string[];
+  outputHash: string;
+  warningIssueIds: string[];
+  createdAt: string;
+};
+
+type ProofApproval = {
+  id: string;
+  proofId: string;
+  proofOutputHash: string;
+  acceptedWarningIssueIds: string[];
+  approvedAt: string;
 };
 ```
+
+Any edit, SKU change, size change, or profile change marks the proof obsolete.
+
+## Cart edit rule
+
+An approved cart item references one immutable proof/design revision.
+
+Editing it:
+1. creates a new draft copied from the approved revision;
+2. leaves the cart item on the old approved revision;
+3. replaces the cart revision only after a new proof is approved.
 
 ## Mock API surface
 
@@ -151,6 +282,7 @@ type Proof = {
 - POST /designs/:id/proof
 - POST /proofs/:id/approve
 - POST /cart/items
+- PUT /cart/items/:id/proof
 - GET /cart
 - POST /checkout/quote
 - POST /payments/mock
@@ -159,14 +291,18 @@ type Proof = {
 
 ## Mock latency/error mode
 
-Development controls should allow:
+Development controls must support:
 - latency 0 / 300 / 1000 / 3000 ms;
 - random 500;
-- save conflict 409;
-- stale revision;
+- stale save / 409;
+- late save response;
 - upload reject;
+- stale preflight;
+- stale proof;
+- proof render failure;
 - payment fail;
 - payment timeout;
-- duplicate callback.
+- duplicate payment callback;
+- inventory invalidation.
 
-This is part of UX testing, not just backend simulation.
+This is part of UX testing, not merely backend simulation.
