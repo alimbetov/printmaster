@@ -150,16 +150,6 @@ export const defaultPlacementFrame = (): PlacementFrameNormalized => ({
   height: .84
 })
 
-export const placementFrameToZoneMm = (
-  frame: PlacementFrameNormalized,
-  zone: MockPrintProfile['front']
-) => ({
-  xMm: zone.xMm + frame.x * zone.widthMm,
-  yMm: zone.yMm + frame.y * zone.heightMm,
-  widthMm: frame.width * zone.widthMm,
-  heightMm: frame.height * zone.heightMm
-})
-
 export const fontCatalog = [
   { id: 'inter', name: 'Inter', family: 'Inter, Arial, sans-serif', category: 'Clean' },
   { id: 'arial', name: 'Arial', family: 'Arial, sans-serif', category: 'Clean' },
