@@ -313,7 +313,7 @@ export default function EditorCanvas({
                 cornerRadius={12}
               />
             )}
-            <Rect
+            {!readOnly && <Rect
               x={zone.xMm * scale}
               y={zone.yMm * scale}
               width={zone.widthMm * scale}
@@ -323,7 +323,7 @@ export default function EditorCanvas({
               dash={[8, 7]}
               cornerRadius={8}
               opacity={.72}
-            />
+            />}
           </Layer>
 
           <Layer>
