@@ -170,7 +170,7 @@ function Catalog() {
         <article className="product-card" key={product.id}>
           <GarmentVisual
             type={product.type}
-            color="#171717"
+            color={product.colors[0].hex}
             text={product.type === 'HOODIE' ? 'MAKE IT' : 'YOUR ART'}
             compact
           />
