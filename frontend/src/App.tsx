@@ -175,6 +175,14 @@ function Catalog() {
             compact
           />
           <h3>{product.name}</h3>
+          <div className="product-card-meta">
+            <span>{product.collection}</span>
+            <span>{product.fit}</span>
+            <span>{product.gsm} GSM</span>
+          </div>
+          <div className="catalog-swatches">
+            {product.colors.map(color => <i key={color.code} title={color.name} style={{ background: color.hex }}/>)}
+          </div>
           <p>{t(product.descriptionKey)}</p>
           <div className="card-row">
             <b>{formatKzt(product.price, i18n.language)}</b>
@@ -193,7 +201,11 @@ function ProductPage({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft)
   const navigate = useNavigate()
   const { t } = useTranslation()
   const product = products.find(item => item.id === id) ?? products[0]
-  const [color, setColor] = useState(draft.productId === product.id ? draft.color : 'black')
+  const [color, setColor] = useState(
+    draft.productId === product.id && product.colors.some(item => item.code === draft.color)
+      ? draft.color
+      : product.colors[0].code
+  )
   const [size, setSize] = useState<Size>(draft.productId === product.id ? draft.size : 'L')
   const chosen = product.colors.find(item => item.code === color) ?? product.colors[0]
 
@@ -255,7 +267,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const navigate = useNavigate()
   const product = products.find(item => item.id === draft.productId) ?? products[1]
   const garmentColor = product.colors.find(item => item.code === draft.color)?.hex ?? '#171717'
-  const profile = printProfiles[draft.productId]
+  const profile = printProfiles[draft.productId] ?? printProfiles['hoodie-basic']
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
   const [zoom, setZoom] = useState(1)
