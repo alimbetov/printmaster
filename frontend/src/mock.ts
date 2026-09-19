@@ -115,6 +115,15 @@ export const printProfiles: Record<string, MockPrintProfile> = {
   }
 }
 
+export const fontCatalog = [
+  { id: 'inter', name: 'Inter', family: 'Inter, Arial, sans-serif', category: 'Clean' },
+  { id: 'arial', name: 'Arial', family: 'Arial, sans-serif', category: 'Clean' },
+  { id: 'georgia', name: 'Georgia', family: 'Georgia, serif', category: 'Editorial' },
+  { id: 'courier', name: 'Courier', family: '"Courier New", monospace', category: 'Mono' },
+  { id: 'impact', name: 'Impact', family: 'Impact, Haettenschweiler, sans-serif', category: 'Bold' },
+  { id: 'trebuchet', name: 'Trebuchet', family: '"Trebuchet MS", sans-serif', category: 'Friendly' }
+] as const
+
 export const createDraft = (productId = 'hoodie-basic'): Draft => ({
   id: 'draft-demo',
   productId,
