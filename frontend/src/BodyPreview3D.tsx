@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Draft, DesignElement } from './types'
-import { getPrintProfile } from './mock'
+import { getPrintProfile, products } from './mock'
 
 type BodyPreset = 'STRAIGHT' | 'ATHLETIC' | 'CURVED' | 'FULL'
 
@@ -26,7 +26,8 @@ const clamp = (value: number, min: number, max: number) =>
 function elementStyle(
   element: DesignElement,
   draft: Draft,
-  shape: BodyShape
+  shape: BodyShape,
+  reliefStrength: number
 ): CSSProperties {
   const profile = getPrintProfile(draft.productId, draft.size)
   const zone = element.side === 'FRONT' ? profile.front : profile.back
@@ -40,13 +41,14 @@ function elementStyle(
   const chestInfluence = 1 - Math.min(1, Math.abs(normalizedY - .28) / .32)
   const abdomenInfluence = 1 - Math.min(1, Math.abs(normalizedY - .72) / .34)
 
-  const bulge =
+  const bulge = (
     chestInfluence * (shape.chest - 40) * .0035 +
     abdomenInfluence * (shape.abdomen - 40) * .0032
+  ) * reliefStrength
 
   const waistCompression =
     (1 - Math.min(1, Math.abs(normalizedY - .52) / .25)) *
-    (40 - shape.waist) * .0026
+    (40 - shape.waist) * .0026 * reliefStrength
 
   const surfaceScaleX = clamp(1 + bulge - waistCompression, .78, 1.28)
   const yawScale = Math.cos(Math.abs(shape.yaw) * Math.PI / 180)
@@ -73,13 +75,15 @@ function elementStyle(
 function RenderBodyElement({
   element,
   draft,
-  shape
+  shape,
+  reliefStrength
 }: {
   element: DesignElement
   draft: Draft
   shape: BodyShape
+  reliefStrength: number
 }) {
-  const style = elementStyle(element, draft, shape)
+  const style = elementStyle(element, draft, shape, reliefStrength)
 
   if (element.type === 'IMAGE') {
     return <img
@@ -160,6 +164,19 @@ export default function BodyPreview3D({
     setShape({ ...presets[next], yaw: shape.yaw })
   }
 
+  const product = products.find(item => item.id === draft.productId) ?? products[0]
+
+  const garmentReliefStrength = useMemo(() => {
+    const typeFactor = product.type === 'TSHIRT' ? 1 : .48
+    const fitFactor =
+      product.fit === 'REGULAR' ? 1 :
+      product.fit === 'RELAXED' ? .86 :
+      .72
+    const gsmFactor = clamp(1.15 - (product.gsm - 180) / 520, .55, 1.08)
+
+    return clamp(typeFactor * fitFactor * gsmFactor, .22, 1.08)
+  }, [product.fit, product.gsm, product.type])
+
   const activeElements = useMemo(
     () => draft.elements
       .filter(element => element.side === draft.activeSide)
@@ -168,9 +185,9 @@ export default function BodyPreview3D({
   )
 
   const shoulderWidth = 58 + shape.shoulders * .32
-  const chestWidth = 52 + shape.chest * .30
-  const waistWidth = 50 + shape.waist * .22
-  const abdomenWidth = 49 + shape.abdomen * .28
+  const chestWidth = 52 + shape.chest * (.30 * garmentReliefStrength)
+  const waistWidth = 50 + shape.waist * (.22 * (.72 + garmentReliefStrength * .28))
+  const abdomenWidth = 49 + shape.abdomen * (.28 * garmentReliefStrength)
 
   const torsoClip = `polygon(
     ${50 - shoulderWidth / 2}% 5%,
@@ -185,8 +202,8 @@ export default function BodyPreview3D({
     ${50 - chestWidth / 2}% 31%
   )`
 
-  const chestShadow = clamp((shape.chest - 25) / 75, 0, 1)
-  const abdomenShadow = clamp((shape.abdomen - 25) / 75, 0, 1)
+  const chestShadow = clamp((shape.chest - 25) / 75, 0, 1) * garmentReliefStrength
+  const abdomenShadow = clamp((shape.abdomen - 25) / 75, 0, 1) * garmentReliefStrength
 
   return <div className="body-preview-layout">
     <div className="body-stage">
@@ -248,6 +265,7 @@ export default function BodyPreview3D({
                 element={element}
                 draft={draft}
                 shape={shape}
+                reliefStrength={garmentReliefStrength}
               />
             )}
           </div>
@@ -256,11 +274,21 @@ export default function BodyPreview3D({
       </div>
       <div className="body-floor-shadow"/>
       <div className="body-preview-note">
-        3D-like preview · production geometry remains flat/mm-accurate
+        3D-like preview · {product.type === 'HOODIE' ? 'hoodie smooths body relief' : 'tee follows body relief more closely'} · production geometry remains flat/mm-accurate
       </div>
     </div>
 
     <div className="body-controls">
+      <div className="body-control-section garment-relief-summary">
+        <b>Garment relief response</b>
+        <div className="relief-meter">
+          <i style={{ width: `${Math.round(garmentReliefStrength * 92)}%` }}/>
+        </div>
+        <small>
+          {product.name} · {product.gsm} GSM · {product.fit.toLowerCase()} fit · relief response {Math.round(garmentReliefStrength * 100)}%
+        </small>
+      </div>
+
       <div className="body-control-section">
         <b>Body preset</b>
         <div className="body-preset-grid">
