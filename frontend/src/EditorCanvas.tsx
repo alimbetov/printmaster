@@ -280,6 +280,7 @@ export default function EditorCanvas({
         fontSize={Math.max(16, height * .72)}
         align={element.textAlign ?? 'center'}
         letterSpacing={(element.letterSpacingMm ?? 0) * scale}
+        lineHeight={element.lineHeight ?? 1}
         verticalAlign="middle"
         stroke={selectedId === element.id ? '#6c4dff' : undefined}
         strokeWidth={selectedId === element.id ? .8 : 0}
