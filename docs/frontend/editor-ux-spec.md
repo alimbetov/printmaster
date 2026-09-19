@@ -270,3 +270,99 @@ For failures:
 - reduced motion support;
 - zoom-safe layout;
 - direct manipulation has numeric/keyboard alternatives where practical.
+
+
+## Focus-group refinements
+
+### Style vs Vibe
+
+Keep the concepts distinct:
+- **Style** modifies the selected element.
+- **Vibe** is an optional whole-design starter/content pack.
+
+Vibe must never be required to edit an existing design.
+
+### Placement presets are profile-specific
+
+Presets such as Small chest, Big front and Big back are resolved against:
+- PrintProfileVersion;
+- side;
+- product variant / size compatibility.
+
+They are not global hardcoded coordinates.
+
+### “Looks ready” semantics
+
+“Looks ready” means:
+- digital design validation passed.
+
+It does **not** guarantee:
+- exact physical color;
+- fabric behavior;
+- adhesion;
+- zero production tolerance.
+
+Final Preview should include concise supporting copy:
+
+“Your digital design checks passed. The garment preview is approximate.”
+
+### Overlapping-element selection
+
+Selection precedence:
+1. transform handles;
+2. currently selected element;
+3. topmost visible element under pointer;
+4. Layers provides deterministic explicit selection.
+
+### Element locking
+
+Multi-element MVP should support locking an element to prevent accidental movement.
+
+Locked element:
+- remains visible;
+- is selectable from Layers;
+- does not move/resize/rotate until unlocked.
+
+### Snapping
+
+Snapping uses viewport-space tolerance for consistent feel at different zoom levels.
+
+The committed result remains canonical millimeter geometry.
+
+### Transform pipeline
+
+Canonical element transform order:
+
+```
+asset crop
+→ local physical size/scale
+→ rotation
+→ translation to garment-space center
+```
+
+EditorRenderer and ProofRenderer must follow equivalent semantics.
+
+### Layer-count budget
+
+Do not assume unbounded canvas complexity.
+
+Define a configurable MVP soft limit and test mobile performance before increasing it.
+
+### Accessibility alternatives to direct manipulation
+
+Essential operations need alternatives to drag-only interaction:
+- Center;
+- alignment actions;
+- exact width/height;
+- keyboard nudge on desktop;
+- Move layer up/down.
+
+### Create-first default garment
+
+Create-first may begin with a default temporary garment context for speed.
+
+Rules:
+- clearly identify the selected/default garment;
+- design remains a draft;
+- actual variant must be confirmed before Final Preview;
+- incompatible variant changes trigger explicit fit/review flow.
