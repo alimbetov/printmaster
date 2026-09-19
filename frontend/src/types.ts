@@ -56,12 +56,20 @@ export type DesignElement = {
 
 export type DraftStatus = 'DRAFT' | 'READY' | 'WARNING' | 'BLOCKED'
 
+export type PlacementFrameNormalized = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export type Draft = {
   id: string
   productId: string
   color: string
   size: Size
   activeSide: Side
+  placementFrames: Record<Side, PlacementFrameNormalized>
   elements: DesignElement[]
   status: DraftStatus
 }
