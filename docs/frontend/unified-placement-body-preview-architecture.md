@@ -1433,3 +1433,60 @@ Higher-fidelity deformation
 Do NOT invest further in independent Body 3D controls until the unified frame is the single source of truth.
 
 That synchronization is the architectural blocker.
+
+
+---
+
+## 42. Implementation status — UPF-1 / UPF-2
+
+Implemented in `fix/live-alpha-review`.
+
+### UPF-1 — Canonical Placement Frame
+
+Implemented:
+- `Draft.placementFrames.FRONT/BACK` is canonical persisted state;
+- normalized coordinates are relative to the production Print Zone;
+- legacy localStorage drafts are migrated to default frames;
+- pure geometry helpers live in `frontend/src/placement.ts`;
+- new elements are created at the active Placement Frame center;
+- Center action targets the Placement Frame center;
+- image initial fitting uses Placement Frame dimensions;
+- Design Check warns when an element leaves the Placement Frame.
+
+### UPF-2 — FLAT interactive frame
+
+Implemented:
+- Production Print Zone and Placement Frame are visually separate;
+- Print Zone remains immutable;
+- Placement Frame is draggable;
+- Placement Frame is resizable;
+- frame drag moves all same-side elements by the same garment-space mm delta;
+- frame cannot be dragged outside Print Zone;
+- resize does not auto-scale artwork;
+- resize is rejected when it would exclude current elements;
+- FRONT/BACK have independent Placement Frames;
+- placement reset is available;
+- workspace zoom/pan remains viewport-only.
+
+### Synchronization hardening pulled forward from UPF-3
+
+Also implemented now to remove the existing split-brain behavior:
+- Body 3D reads the canonical Placement Frame;
+- Body 3D no longer persists a private frame;
+- dragging the frame in Body 3D commits the same canonical frame;
+- Body drag moves the design by the same canonical mm delta;
+- Body frame resize updates the same canonical frame;
+- switching back to FLAT displays the new position.
+
+### Remaining UPF-3+ work
+
+Still required:
+- formal inverse projection abstraction instead of current 2.5D envelope approximation;
+- undo/redo command integration for frame gestures;
+- keyboard frame move/resize;
+- touch gesture hardening;
+- automated geometry tests;
+- measured SKU size profiles replacing proportional mock scaling;
+- versioned GarmentCutProfile / MaterialProfile;
+- adult/teen/child/toddler calibrated body cohorts;
+- proof staleness/version contract in backend.
