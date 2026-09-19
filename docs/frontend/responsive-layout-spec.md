@@ -2,7 +2,7 @@
 
 ## Breakpoint philosophy
 
-Do not design three unrelated applications. Use one interaction model adapted to available space.
+Use one product model with layouts optimized for available space.
 
 Reference classes:
 - Mobile: 320–767 px
@@ -11,125 +11,169 @@ Reference classes:
 
 Breakpoints are layout triggers, not device detection.
 
-## Desktop editor
+## Experience priority
 
-Recommended composition:
+For the target audience, mobile is not a reduced editor. It is a primary creation surface.
+
+Across all sizes:
+- canvas/product preview is visually dominant;
+- production controls are progressive;
+- primary actions stay in reach;
+- Final preview is always easy to reach.
+
+## Desktop editor
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Header: product / color / size / save / cart                           │
+│ Product context         FRONT / BACK              Saved       Preview  │
 ├──────────────┬──────────────────────────────────────┬────────────────────┤
-│ Add content  │                                      │ Properties/Layers  │
-│              │              Canvas                  │                    │
-│ Image        │                                      │ Object controls    │
-│ Text         │         garment + print zone         │ Physical size      │
-│ Stickers     │                                      │ Preflight          │
+│ Add / Vibes  │                                      │ Contextual edit    │
+│              │                                      │                    │
+│ Image        │              GARMENT                 │ Style              │
+│ Text         │                                      │ Layers             │
+│ Stickers     │             [ DESIGN ]               │ Design check       │
+│ Presets      │                                      │                    │
 │              │                                      │                    │
 ├──────────────┴──────────────────────────────────────┴────────────────────┤
-│ FRONT / BACK     Zoom     Undo / Redo       Review proof                │
+│ Undo / Redo                    Zoom                         Final preview │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Rules:
-- Canvas gets majority of width.
-- Left rail is creation-oriented.
-- Right rail is context-oriented.
-- Do not hide preflight status below the fold.
-- Product/size context remains visible.
+Do not expose a permanent dense properties inspector unless an element needs it.
 
 ## Tablet editor
 
-Use two-pane layout:
-- canvas as primary area;
-- one adaptive side panel;
-- toolbar switches between Add / Properties / Layers / Preflight.
+Tablet should feel like a creation workstation.
 
 ```
 ┌──────────────────────────────────────────────┐
-│ Product context + FRONT/BACK + save          │
+│ Hoodie · Black · L    FRONT      Preview    │
 ├────────────────────────────┬─────────────────┤
-│                            │                 │
-│          Canvas            │ Adaptive panel  │
-│                            │                 │
+│                            │ Context panel   │
+│          GARMENT           │                 │
+│        [ DESIGN ]          │ Style / Layers  │
+│                            │ Check           │
 ├────────────────────────────┴─────────────────┤
-│ Add | Edit | Layers | Check | Review         │
+│ Add   Style   Layers   Check                │
 └──────────────────────────────────────────────┘
 ```
 
-Panel may collapse to increase canvas size.
+Panel collapses easily to maximize canvas.
 
 ## Mobile editor
 
-Mobile must not imitate desktop sidebars.
-
-Use:
-- fixed top product context;
-- central canvas;
-- bottom mode bar;
-- bottom sheet for tools/properties;
-- explicit Done/Apply for crop and destructive transformations.
+Mobile prioritizes one-handed creation and direct manipulation.
 
 ```
 ┌─────────────────────────────┐
-│ Hoodie · Black · L    Save  │
-│ FRONT        ✓ Printable    │
+│ Hoodie · Black · L  Preview │
+│ FRONT          Looks ready  │
 ├─────────────────────────────┤
 │                             │
-│           Canvas            │
+│          GARMENT            │
 │                             │
-│      24.7 × 29.3 cm         │
+│       [  DESIGN  ]          │
+│                             │
 │                             │
 ├─────────────────────────────┤
-│ + Add | Layers | Check      │
-├─────────────────────────────┤
-│ Image  Text  Stickers       │
+│ Add   Style   Layers  Check │
 └─────────────────────────────┘
 ```
+
+When an object is selected, bottom dock becomes contextual:
+
+```
+┌─────────────────────────────┐
+│ Crop  Duplicate  Size  More │
+└─────────────────────────────┘
+```
+
+## Bottom sheets
+
+Use visual bottom sheets for:
+- Add
+- Style/font/sticker discovery
+- Layers
+- Design check
+- Product variant quick change
+
+Sheets should support:
+- half-height peek;
+- expand to full height;
+- preserve canvas context;
+- clear close affordance.
 
 ## Mobile interaction rules
 
 - One-finger drag moves selected object.
-- Pinch on canvas zooms viewport only when no object gesture is active.
-- Object resize uses visible handles, not pinch by default.
-- Rotation uses explicit rotate handle; two-finger rotate is optional later.
-- Bottom sheets must preserve canvas context.
-- Destructive actions require immediate Undo affordance.
-- Do not place critical actions only behind long press.
-- Never require hover.
+- Pinch on canvas controls viewport only.
+- Resize uses visible handles.
+- Rotate uses explicit handle.
+- No critical long-press actions.
+- No hover dependencies.
+- Undo stays easy to reach after destructive gestures.
+- Virtual keyboard must not cover Apply/Done.
+
+## Thumb-zone priority
+
+Primary mobile actions belong in bottom/central reach:
+- Add
+- Style
+- Layers
+- Check
+- Preview
+
+Secondary account/navigation actions may stay top.
 
 ## Tablet considerations
 
-Tablet is likely a strong editing surface and deserves first-class support:
-- Apple Pencil / stylus should behave as pointer;
-- minimum hit target 44×44 CSS px;
-- panels should not cover the selected artwork when avoidable;
-- landscape and portrait layouts both supported.
+- stylus behaves as pointer;
+- min 44×44 CSS px hit targets;
+- landscape and portrait;
+- panels avoid covering selected artwork;
+- keyboard attachment should enhance, not change, editor semantics.
 
 ## Responsive behavior matrix
 
 | Area | Desktop | Tablet | Mobile |
 |---|---|---|---|
-| Navigation | full header | compact header | compact header |
-| Add tools | left rail | adaptive panel | bottom sheet |
-| Properties | right rail | adaptive panel | bottom sheet |
-| Layers | right tab | adaptive panel | full-height sheet |
-| Preflight | persistent summary | tab + badge | badge + sheet |
-| Canvas zoom | controls + wheel | controls/pinch | controls/pinch |
+| Canvas | dominant center | dominant | dominant/full |
+| Add | left visual rail | adaptive panel | bottom sheet |
+| Style | contextual panel | adaptive panel | bottom sheet |
+| Layers | contextual tab | adaptive panel | sheet |
+| Design check | persistent summary | badge + panel | badge + sheet |
 | FRONT/BACK | persistent | persistent | persistent |
-| Review proof | primary CTA | primary CTA | sticky CTA |
+| Final preview | primary CTA | primary CTA | sticky/top CTA |
+| Exact measurements | contextual | contextual | secondary sheet |
+| Vibe packs | visual rail/sheet | sheet | sheet |
 
 ## Orientation changes
 
-When viewport rotates:
-- canonical design geometry does not change;
-- editor viewport is recalculated;
+Viewport rotates:
+- garment geometry stays unchanged;
+- canvas projection recalculates;
 - selection remains;
-- zoom may be recalculated to fit;
-- no autosave should serialize viewport pixels.
+- active unsafe gesture may cancel;
+- no viewport pixels are persisted.
+
+## Motion
+
+Allow subtle:
+- snap feedback;
+- side flip;
+- sheet transitions;
+- preview reveal.
+
+Respect prefers-reduced-motion.
+
+Avoid decorative motion that competes with design.
 
 ## Safe-area support
 
-On mobile:
-- account for iOS/Android safe insets;
-- bottom CTA must remain above browser/home indicators;
-- sheets must not hide confirmation actions behind virtual keyboards.
+Account for:
+- iOS/Android safe insets;
+- browser bars;
+- virtual keyboard;
+- foldable/split layouts where feasible.
+
+Primary CTA must remain reachable.
