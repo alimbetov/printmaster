@@ -179,7 +179,8 @@ export const createDraft = (productId = 'hoodie-basic', size: Size = 'L'): Draft
       fontStyle: 'normal',
       fontWeight: 800,
       textAlign: 'center',
-      letterSpacingMm: 0
+      letterSpacingMm: 0,
+      lineHeight: 1
     }
   ]
   }
