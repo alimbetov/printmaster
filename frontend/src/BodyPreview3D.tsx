@@ -229,6 +229,16 @@ export default function BodyPreview3D({
     [draft.activeSide, draft.elements]
   )
 
+  const previewDxMm = (visibleFrame.x - canonicalFrame.x) * zone.widthMm
+  const previewDyMm = (visibleFrame.y - canonicalFrame.y) * zone.heightMm
+  const visibleElements = dragPreview
+    ? activeElements.map(element => ({
+        ...element,
+        xMm: element.xMm + previewDxMm,
+        yMm: element.yMm + previewDyMm
+      }))
+    : activeElements
+
   const shoulderWidth = 58 + shape.shoulders * .32
   const chestWidth = 52 + shape.chest * (.30 * garmentReliefStrength)
   const waistWidth = 50 + shape.waist * (.22 * (.72 + garmentReliefStrength * .28))
@@ -329,7 +339,7 @@ export default function BodyPreview3D({
               height: `${BODY_PRINT_ENVELOPE.heightPct}%`
             }}
           >
-            {activeElements.map(element =>
+            {visibleElements.map(element =>
               <RenderBodyElement
                 key={element.id}
                 element={element}
@@ -407,8 +417,8 @@ export default function BodyPreview3D({
           <span><b>Frame width</b><i>{Math.round(canonicalFrame.width * 100)}%</i></span>
           <input
             type="range"
-            min="18"
-            max="96"
+            min="10"
+            max="100"
             value={Math.round(canonicalFrame.width * 100)}
             onChange={event => resizeFrame({
               width: Number(event.target.value) / 100
@@ -420,8 +430,8 @@ export default function BodyPreview3D({
           <span><b>Frame height</b><i>{Math.round(canonicalFrame.height * 100)}%</i></span>
           <input
             type="range"
-            min="18"
-            max="96"
+            min="10"
+            max="100"
             value={Math.round(canonicalFrame.height * 100)}
             onChange={event => resizeFrame({
               height: Number(event.target.value) / 100
@@ -442,13 +452,12 @@ export default function BodyPreview3D({
               alert('Default placement frame would exclude current elements. Move or resize the design first.')
               return
             }
-            onChange({
-              ...draft,
-              placementFrames: {
-                ...draft.placementFrames,
-                [draft.activeSide]: next
-              }
-            })
+            onChange(movePlacementFrameWithDesign(
+              draft,
+              draft.activeSide,
+              next,
+              zone
+            ))
           }}
         >
           Reset placement frame
