@@ -19,6 +19,7 @@ type Props = {
   onSelect: (id: string | null) => void
   onChange: (draft: Draft) => void
   readOnly?: boolean
+  zoom?: number
 }
 
 function useElementImage(src?: string) {
@@ -132,7 +133,8 @@ export default function EditorCanvas({
   selectedId,
   onSelect,
   onChange,
-  readOnly = false
+  readOnly = false,
+  zoom = 1
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
@@ -162,8 +164,9 @@ export default function EditorCanvas({
   const scale = useMemo(() => {
     const horizontal = (viewport.width - 32) / profile.garmentWidthMm
     const vertical = (viewport.height - 32) / profile.garmentHeightMm
-    return Math.max(0.25, Math.min(horizontal, vertical, 1.05))
-  }, [profile, viewport])
+    const fit = Math.max(0.25, Math.min(horizontal, vertical, 1.05))
+    return Math.max(0.2, Math.min(fit * zoom, 1.8))
+  }, [profile, viewport, zoom])
 
   const stageWidth = profile.garmentWidthMm * scale
   const stageHeight = profile.garmentHeightMm * scale
@@ -262,10 +265,15 @@ export default function EditorCanvas({
         {...common}
         text={element.type === 'STICKER' ? element.label : element.label}
         fill={element.fill ?? (garmentColor === '#f4f4f2' ? '#111214' : '#ffffff')}
-        fontFamily="Inter, Arial, sans-serif"
-        fontStyle={element.type === 'TEXT' ? 'bold' : 'normal'}
+        fontFamily={element.fontFamily ?? 'Inter, Arial, sans-serif'}
+        fontStyle={
+          element.type === 'TEXT'
+            ? `${(element.fontWeight ?? 800) >= 700 ? 'bold' : ''} ${element.fontStyle ?? 'normal'}`.trim()
+            : 'normal'
+        }
         fontSize={Math.max(16, height * .72)}
-        align="center"
+        align={element.textAlign ?? 'center'}
+        letterSpacing={(element.letterSpacingMm ?? 0) * scale}
         verticalAlign="middle"
         stroke={selectedId === element.id ? '#6c4dff' : undefined}
         strokeWidth={selectedId === element.id ? .8 : 0}
