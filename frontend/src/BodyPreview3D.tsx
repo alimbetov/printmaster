@@ -55,17 +55,24 @@ function elementStyle(
   const height = (element.heightMm / zone.heightMm) * 100
 
   const normalizedY = clamp((element.yMm - zone.yMm) / zone.heightMm, 0, 1)
-  const chestInfluence = 1 - Math.min(1, Math.abs(normalizedY - .28) / .32)
-  const abdomenInfluence = 1 - Math.min(1, Math.abs(normalizedY - .72) / .34)
+  const upperInfluence = 1 - Math.min(1, Math.abs(normalizedY - .28) / .32)
+  const lowerInfluence = 1 - Math.min(1, Math.abs(normalizedY - .72) / .34)
+  const waistInfluence = 1 - Math.min(1, Math.abs(normalizedY - .52) / .25)
 
-  const bulge = (
-    chestInfluence * (shape.chest - 40) * .0035 +
-    abdomenInfluence * (shape.abdomen - 40) * .0032
-  ) * reliefStrength
+  const bulge = element.side === 'FRONT'
+    ? (
+        upperInfluence * (shape.chest - 40) * .0035 +
+        lowerInfluence * (shape.abdomen - 40) * .0032
+      ) * reliefStrength
+    : (
+        upperInfluence * (shape.shoulders - 40) * .0022 +
+        lowerInfluence * (shape.waist - 40) * .0013
+      ) * reliefStrength
 
   const waistCompression =
-    (1 - Math.min(1, Math.abs(normalizedY - .52) / .25)) *
-    (40 - shape.waist) * .0026 * reliefStrength
+    waistInfluence * (40 - shape.waist) *
+    (element.side === 'FRONT' ? .0026 : .0018) *
+    reliefStrength
 
   const surfaceScaleX = clamp(1 + bulge - waistCompression, .78, 1.28)
   const yawScale = Math.cos(Math.abs(shape.yaw) * Math.PI / 180)
@@ -328,9 +335,15 @@ export default function BodyPreview3D({
             }}
           >
             <span className="body-relief-label">PLACEMENT</span>
-            <i className="relief-line relief-chest">Chest</i>
-            <i className="relief-line relief-waist">Waist</i>
-            <i className="relief-line relief-abdomen">Abdomen</i>
+            {draft.activeSide === 'FRONT' ? <>
+              <i className="relief-line relief-chest">Chest</i>
+              <i className="relief-line relief-waist">Waist</i>
+              <i className="relief-line relief-abdomen">Abdomen</i>
+            </> : <>
+              <i className="relief-line relief-chest">Upper back</i>
+              <i className="relief-line relief-waist">Waist</i>
+              <i className="relief-line relief-abdomen">Lower back</i>
+            </>}
           </div>
 
           <div
