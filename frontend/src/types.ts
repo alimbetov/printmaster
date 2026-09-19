@@ -94,7 +94,7 @@ export type MockPrintProfile = {
 }
 
 export type PreflightIssue = {
-  code: 'OUTSIDE_PRINT_AREA' | 'LOW_DPI'
+  code: 'OUTSIDE_PRINT_AREA' | 'OUTSIDE_PLACEMENT_FRAME' | 'LOW_DPI'
   severity: 'BLOCKER' | 'WARNING'
   elementId: string
   value?: number
