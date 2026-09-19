@@ -130,3 +130,6 @@ main{max-width:1440px;margin:0 auto}.hero{min-height:680px;display:grid;grid-tem
 .bottom-sheet .variant-size-row{border-top-color:var(--border)}
 .bottom-sheet .variant-size-chips button{background:#f7f7f8;color:#111;border-color:var(--border)}
 .bottom-sheet .variant-size-chips button.active{background:#111214;color:#fff;border-color:#111214}
+
+.inspector textarea{width:100%;min-height:68px;resize:vertical;border:1px solid #484a52;border-radius:10px;background:#24252a;color:#fff;padding:8px 9px;font:inherit}
+.bottom-sheet .inspector textarea{background:#fff;color:#111;border-color:var(--border)}
