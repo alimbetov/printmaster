@@ -316,7 +316,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         fontStyle: 'normal',
         fontWeight: 800,
         textAlign: 'center',
-        letterSpacingMm: 0
+        letterSpacingMm: 0,
+        lineHeight: 1
       }]
     })
     setSelectedId(id)
@@ -714,7 +715,8 @@ function EditorInspector({
     {selected.type === 'TEXT' && <>
       <label>
         {t('text')}
-        <input
+        <textarea
+          rows={2}
           value={selected.label}
           onChange={event => onUpdate({ label: event.target.value })}
         />
@@ -772,6 +774,16 @@ function EditorInspector({
             step=".2"
             value={selected.letterSpacingMm ?? 0}
             onChange={event => onUpdate({ letterSpacingMm: Number(event.target.value) })}
+          />
+        </label>
+        <label>Line height
+          <input
+            type="number"
+            min=".8"
+            max="2"
+            step=".1"
+            value={selected.lineHeight ?? 1}
+            onChange={event => onUpdate({ lineHeight: Number(event.target.value) })}
           />
         </label>
       </div>
