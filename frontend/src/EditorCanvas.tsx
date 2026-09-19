@@ -267,9 +267,15 @@ export default function EditorCanvas({
         fill={element.fill ?? (garmentColor === '#f4f4f2' ? '#111214' : '#ffffff')}
         fontFamily={element.fontFamily ?? 'Inter, Arial, sans-serif'}
         fontStyle={
-          element.type === 'TEXT'
-            ? `${(element.fontWeight ?? 800) >= 700 ? 'bold' : ''} ${element.fontStyle ?? 'normal'}`.trim()
-            : 'normal'
+          element.type !== 'TEXT'
+            ? 'normal'
+            : (element.fontWeight ?? 800) >= 700 && element.fontStyle === 'italic'
+              ? 'bold italic'
+              : (element.fontWeight ?? 800) >= 700
+                ? 'bold'
+                : element.fontStyle === 'italic'
+                  ? 'italic'
+                  : 'normal'
         }
         fontSize={Math.max(16, height * .72)}
         align={element.textAlign ?? 'center'}
