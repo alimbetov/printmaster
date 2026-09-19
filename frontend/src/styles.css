@@ -258,3 +258,33 @@ main{max-width:1440px;margin:0 auto}.hero{min-height:680px;display:grid;grid-tem
 @media(max-width:900px){
   .canvas-pan{right:10px;bottom:86px;transform:scale(.9);transform-origin:bottom right}
 }
+
+.placement-summary{
+  margin-top:16px;
+  padding:14px;
+  border:1px solid #4a4561;
+  border-radius:16px;
+  background:linear-gradient(180deg,rgba(108,77,255,.10),rgba(108,77,255,.035));
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.placement-summary small{color:#aeb0b8;line-height:1.4}
+.placement-summary button{
+  min-height:38px;
+  border:1px solid #544d74;
+  border-radius:10px;
+  background:#2b2938;
+  color:#fff;
+  font-weight:800;
+}
+.bottom-sheet .placement-summary{
+  background:#f7f5ff;
+  border-color:#d9d0ff;
+  color:#111;
+}
+.bottom-sheet .placement-summary button{
+  background:#fff;
+  color:#111;
+  border-color:#d9d0ff;
+}
