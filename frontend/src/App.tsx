@@ -1076,6 +1076,11 @@ function DesignCheck({
   const issues = getPreflightIssues(draft)
   const status = getDraftStatus(draft)
   const acceptedWarnings = new Set(draft.acceptedWarnings ?? [])
+  const hasUnacceptedLowDpi = issues.some(issue =>
+    issue.code === 'LOW_DPI' &&
+    !acceptedWarnings.has(`${issue.code}:${issue.elementId}`)
+  )
+  const hasBlockers = issues.some(issue => issue.severity === 'BLOCKER')
 
   const acknowledgeWarning = (code: string, elementId: string) => {
     const key = `${code}:${elementId}`
@@ -1204,9 +1209,14 @@ function DesignCheck({
       <div className="check-card good">✓ {t('insideArea')}</div>
     </>}
 
-    {status === 'READY' || status === 'WARNING'
+    {!hasBlockers && !hasUnacceptedLowDpi
       ? <Link className="btn primary full" to="/preview">{t('continue')}</Link>
-      : <Link className="btn secondary full" to="/editor">{t('edit')}</Link>}
+      : hasUnacceptedLowDpi
+        ? <div className="check-card warning-card">
+            <b>{t('chooseImageQualityAction')}</b>
+            <p>{t('chooseImageQualityActionHint')}</p>
+          </div>
+        : <Link className="btn secondary full" to="/editor">{t('edit')}</Link>}
   </main></div>
 }
 
