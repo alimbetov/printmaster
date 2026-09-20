@@ -8,7 +8,9 @@ import type {
 import { getPrintProfile, products } from './mock'
 import {
   frameContainsElements,
+  getEffectivePrintZone,
   getFrameForSide,
+  getPrintZoneOffset,
   movePlacementFrameWithDesign,
   normalizePlacementFrame
 } from './placement'
@@ -47,7 +49,8 @@ function elementStyle(
   reliefStrength: number
 ): CSSProperties {
   const profile = getPrintProfile(draft.productId, draft.size)
-  const zone = element.side === 'FRONT' ? profile.front : profile.back
+  const baseZone = element.side === 'FRONT' ? profile.front : profile.back
+  const zone = getEffectivePrintZone(draft, element.side, baseZone)
 
   const left = ((element.xMm - zone.xMm) / zone.widthMm) * 100
   const top = ((element.yMm - zone.yMm) / zone.heightMm) * 100
@@ -161,7 +164,15 @@ export default function BodyPreview3D({
     () => getPrintProfile(draft.productId, draft.size),
     [draft.productId, draft.size]
   )
-  const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const baseZone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const zone = getEffectivePrintZone(draft, draft.activeSide, baseZone)
+  const zoneOffset = getPrintZoneOffset(draft, draft.activeSide)
+  const bodyEnvelope = {
+    leftPct: BODY_PRINT_ENVELOPE.leftPct + (zoneOffset.xMm / profile.garmentWidthMm) * 100,
+    topPct: BODY_PRINT_ENVELOPE.topPct + (zoneOffset.yMm / profile.garmentHeightMm) * 100,
+    widthPct: BODY_PRINT_ENVELOPE.widthPct,
+    heightPct: BODY_PRINT_ENVELOPE.heightPct
+  }
   const canonicalFrame = getFrameForSide(draft, draft.activeSide)
   const visibleFrame = dragPreview ?? canonicalFrame
 
@@ -271,10 +282,10 @@ export default function BodyPreview3D({
   const abdomenShadow = clamp((shape.abdomen - 25) / 75, 0, 1) * garmentReliefStrength
 
   const frameBodyStyle: CSSProperties = {
-    left: `${BODY_PRINT_ENVELOPE.leftPct + visibleFrame.x * BODY_PRINT_ENVELOPE.widthPct}%`,
-    top: `${BODY_PRINT_ENVELOPE.topPct + visibleFrame.y * BODY_PRINT_ENVELOPE.heightPct}%`,
-    width: `${visibleFrame.width * BODY_PRINT_ENVELOPE.widthPct}%`,
-    height: `${visibleFrame.height * BODY_PRINT_ENVELOPE.heightPct}%`
+    left: `${bodyEnvelope.leftPct + visibleFrame.x * bodyEnvelope.widthPct}%`,
+    top: `${bodyEnvelope.topPct + visibleFrame.y * bodyEnvelope.heightPct}%`,
+    width: `${visibleFrame.width * bodyEnvelope.widthPct}%`,
+    height: `${visibleFrame.height * bodyEnvelope.heightPct}%`
   }
 
   const resizeFrame = (
@@ -349,10 +360,10 @@ export default function BodyPreview3D({
           <div
             className="body-print-surface"
             style={{
-              left: `${BODY_PRINT_ENVELOPE.leftPct}%`,
-              top: `${BODY_PRINT_ENVELOPE.topPct}%`,
-              width: `${BODY_PRINT_ENVELOPE.widthPct}%`,
-              height: `${BODY_PRINT_ENVELOPE.heightPct}%`
+              left: `${bodyEnvelope.leftPct}%`,
+              top: `${bodyEnvelope.topPct}%`,
+              width: `${bodyEnvelope.widthPct}%`,
+              height: `${bodyEnvelope.heightPct}%`
             }}
           >
             {visibleElements.map(element =>
