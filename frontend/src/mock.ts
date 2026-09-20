@@ -8,7 +8,7 @@ import type {
   Side,
   Size
 } from './types'
-import { frameToMm, getFrameForSide } from './placement'
+import { frameToMm, getEffectivePrintZone, getFrameForSide } from './placement'
 
 export const products: Product[] = [
   {
@@ -170,6 +170,10 @@ export const createDraft = (productId = 'hoodie-basic', size: Size = 'L'): Draft
   color: product.colors[0].code,
   size,
   activeSide: 'FRONT',
+  printZoneOffsets: {
+    FRONT: { xMm: 0, yMm: 0 },
+    BACK: { xMm: 0, yMm: 0 }
+  },
   placementFrames: {
     FRONT: defaultPlacementFrame(),
     BACK: defaultPlacementFrame()
@@ -212,7 +216,8 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
   const issues: PreflightIssue[] = []
 
   for (const element of draft.elements) {
-    const zone = element.side === 'FRONT' ? profile.front : profile.back
+    const baseZone = element.side === 'FRONT' ? profile.front : profile.back
+    const zone = getEffectivePrintZone(draft, element.side, baseZone)
     const half = rotatedHalfExtents(element.widthMm, element.heightMm, element.rotationDeg)
     const placement = frameToMm(getFrameForSide(draft, element.side), zone)
 
