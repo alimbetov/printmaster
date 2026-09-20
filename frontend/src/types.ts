@@ -77,6 +77,7 @@ export type Draft = {
   printZoneOffsets: Record<Side, PrintZoneOffset>
   placementFrames: Record<Side, PlacementFrameNormalized>
   elements: DesignElement[]
+  acceptedWarnings?: string[]
   status: DraftStatus
 }
 
@@ -104,4 +105,6 @@ export type PreflightIssue = {
   severity: 'BLOCKER' | 'WARNING'
   elementId: string
   value?: number
+  recommendedWidthMm?: number
+  recommendedHeightMm?: number
 }
