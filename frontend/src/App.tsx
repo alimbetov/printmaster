@@ -31,6 +31,7 @@ import {
   getFrameForSide,
   getPrintZoneOffset,
   movePlacementFrameWithDesign,
+  movePrintZoneWithDesign,
   normalizePlacementFrame
 } from './placement'
 
@@ -326,6 +327,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const zone = getEffectivePrintZone(draft, draft.activeSide, baseZone)
   const placementFrame = getFrameForSide(draft, draft.activeSide)
   const placementMm = frameToMm(placementFrame, zone)
+  const printZoneOffset = getPrintZoneOffset(draft, draft.activeSide)
   const maxZ = Math.max(0, ...draft.elements.map(element => element.zOrder))
 
   const addText = () => {
@@ -557,6 +559,14 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     })
   }
 
+  const resetPrintZone = () => {
+    commit(movePrintZoneWithDesign(
+      draft,
+      draft.activeSide,
+      { xMm: 0, yMm: 0 }
+    ))
+  }
+
   const resetPlacementFrame = () => {
     const target = normalizePlacementFrame({
       x: .08,
@@ -678,6 +688,20 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
           onColor={color => commit({ ...draft, color })}
           onSize={changeSize}
         />
+
+        <div className="placement-summary print-zone-summary">
+          <div className="inspector-head">
+            <b>Print Zone Position</b>
+            <span>
+              {printZoneOffset.xMm >= 0 ? '+' : ''}{(printZoneOffset.xMm / 10).toFixed(1)} /
+              {' '}{printZoneOffset.yMm >= 0 ? '+' : ''}{(printZoneOffset.yMm / 10).toFixed(1)} cm
+            </span>
+          </div>
+          <small>
+            Drag the gray/orange PRINT ZONE border directly on the garment. Placement and artwork move with it.
+          </small>
+          <button onClick={resetPrintZone}>Reset print zone</button>
+        </div>
 
         <div className="placement-summary">
           <div className="inspector-head">
