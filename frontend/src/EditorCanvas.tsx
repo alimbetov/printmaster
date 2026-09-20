@@ -263,12 +263,23 @@ export default function EditorCanvas({
     node.scaleX(1)
     node.scaleY(1)
 
-    updateElement(element.id, {
-      xMm: Number((node.x() / scale).toFixed(3)),
-      yMm: Number((node.y() / scale).toFixed(3)),
-      widthMm: Number(nextWidth.toFixed(3)),
-      heightMm: Number(nextHeight.toFixed(3)),
-      rotationDeg: Number((((node.rotation() % 360) + 360) % 360).toFixed(2))
+    onChange({
+      ...draft,
+      acceptedWarnings: (draft.acceptedWarnings ?? []).filter(
+        key => !key.endsWith(`:${element.id}`)
+      ),
+      elements: draft.elements.map(item =>
+        item.id === element.id
+          ? {
+              ...item,
+              xMm: Number((node.x() / scale).toFixed(3)),
+              yMm: Number((node.y() / scale).toFixed(3)),
+              widthMm: Number(nextWidth.toFixed(3)),
+              heightMm: Number(nextHeight.toFixed(3)),
+              rotationDeg: Number((((node.rotation() % 360) + 360) % 360).toFixed(2))
+            }
+          : item
+      )
     })
   }
 
