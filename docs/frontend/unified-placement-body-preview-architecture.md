@@ -1490,3 +1490,53 @@ Still required:
 - versioned GarmentCutProfile / MaterialProfile;
 - adult/teen/child/toddler calibrated body cohorts;
 - proof staleness/version contract in backend.
+
+
+---
+
+## 43. Movable Effective Print Zone
+
+The initial UPF contract treated the customer-visible Print Zone as position-fixed. Product review changed this requirement.
+
+The corrected model distinguishes:
+
+```
+PrintProfile.basePrintZone     immutable calibrated factory definition
++
+DesignRevision.printZoneOffset  customer/design-specific placement offset
+=
+EffectivePrintZone             actual design/preflight zone
+```
+
+### Rules
+
+1. Base Print Zone size and calibration remain owned by the versioned PrintProfile.
+2. Customer may move the Effective Print Zone left/right/up/down.
+3. Movement is side-specific: FRONT and BACK offsets are independent.
+4. Effective Print Zone must remain inside the allowed garment/body-panel envelope.
+5. Moving Effective Print Zone moves:
+   - Placement Frame;
+   - all design elements on that side;
+   by exactly the same garment-space mm delta.
+6. Effective Print Zone movement must be persisted in DesignRevision.
+7. FLAT, Body Preview, Final Preview and preflight consume the same Effective Print Zone.
+8. Reset restores offset to 0/0 and moves the composition by the inverse mm delta.
+9. Print Zone movement changes design/proof state and must invalidate any previously approved proof in the backend phase.
+10. Future production profiles should replace the temporary rectangular body-panel movement envelope with a calibrated polygon / allowed-region map.
+
+### Draft contract
+
+```ts
+type PrintZoneOffset = {
+  xMm: number;
+  yMm: number;
+};
+
+type Draft = {
+  ...
+  printZoneOffsets: Record<Side, PrintZoneOffset>;
+  placementFrames: Record<Side, PlacementFrameNormalized>;
+};
+```
+
+The offset is measured from the versioned PrintProfile base zone and is never baked back into the PrintProfile itself.
