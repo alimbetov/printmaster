@@ -244,15 +244,6 @@ export default function EditorCanvas({
     transformer.getLayer()?.batchDraw()
   }, [frameSelected, printZoneSelected, readOnly, placementFrame, scale])
 
-  const updateElement = (id: string, patch: Partial<DesignElement>) => {
-    onChange({
-      ...draft,
-      elements: draft.elements.map(element =>
-        element.id === id ? { ...element, ...patch } : element
-      )
-    })
-  }
-
   const commitNode = (element: DesignElement, node: Konva.Node) => {
     const nextScaleX = node.scaleX()
     const nextScaleY = node.scaleY()
