@@ -262,11 +262,21 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
       const effectiveDpi = Math.round(Math.min(dpiX, dpiY))
 
       if (effectiveDpi < 150) {
+        const recommendedWidthMm = element.sourceWidthPx / 150 * 25.4
+        const recommendedHeightMm = element.sourceHeightPx / 150 * 25.4
+        const fitScale = Math.min(
+          recommendedWidthMm / element.widthMm,
+          recommendedHeightMm / element.heightMm,
+          1
+        )
+
         issues.push({
           code: 'LOW_DPI',
-          severity: effectiveDpi < 100 ? 'BLOCKER' : 'WARNING',
+          severity: 'WARNING',
           elementId: element.id,
-          value: effectiveDpi
+          value: effectiveDpi,
+          recommendedWidthMm: Number((element.widthMm * fitScale).toFixed(2)),
+          recommendedHeightMm: Number((element.heightMm * fitScale).toFixed(2))
         })
       }
     }
@@ -277,9 +287,16 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
 
 export const getDraftStatus = (draft: Draft): DraftStatus => {
   if (draft.elements.length === 0) return 'DRAFT'
+  const accepted = new Set(draft.acceptedWarnings ?? [])
   const issues = getPreflightIssues(draft)
   if (issues.some(issue => issue.severity === 'BLOCKER')) return 'BLOCKED'
-  if (issues.length > 0) return 'WARNING'
+
+  const actionableIssues = issues.filter(issue => {
+    const key = `${issue.code}:${issue.elementId}`
+    return !accepted.has(key)
+  })
+
+  if (actionableIssues.length > 0) return 'WARNING'
   return 'READY'
 }
 
