@@ -112,7 +112,7 @@ function App() {
       <Route path="/products" element={<Catalog />} />
       <Route path="/products/:id" element={<ProductPage draft={draft} onDraft={updateDraft} />} />
       <Route path="/editor" element={<Editor draft={draft} onDraft={updateDraft} />} />
-      <Route path="/check" element={<DesignCheck draft={draft} />} />
+      <Route path="/check" element={<DesignCheck draft={draft} onDraft={updateDraft} />} />
       <Route path="/preview" element={<FinalPreview draft={draft} onApprove={approve} />} />
       <Route path="/cart" element={<Cart approved={approved} />} />
       <Route path="/checkout" element={<Checkout approved={approved} />} />
@@ -317,6 +317,9 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const updateElement = (id: string, patch: Partial<DesignElement>) => {
     commit({
       ...draft,
+      acceptedWarnings: (draft.acceptedWarnings ?? []).filter(
+        key => !key.endsWith(`:${id}`)
+      ),
       elements: draft.elements.map(element =>
         element.id === id ? { ...element, ...patch } : element
       )
@@ -1062,10 +1065,48 @@ function StatusInline({ status }: { status: Draft['status'] }) {
   return <span>✓ {t('looksReady')}</span>
 }
 
-function DesignCheck({ draft }: { draft: Draft }) {
+function DesignCheck({
+  draft,
+  onDraft
+}: {
+  draft: Draft
+  onDraft: (draft: Draft) => void
+}) {
   const { t } = useTranslation()
   const issues = getPreflightIssues(draft)
   const status = getDraftStatus(draft)
+  const acceptedWarnings = new Set(draft.acceptedWarnings ?? [])
+
+  const acknowledgeWarning = (code: string, elementId: string) => {
+    const key = `${code}:${elementId}`
+    onDraft({
+      ...draft,
+      acceptedWarnings: Array.from(new Set([
+        ...(draft.acceptedWarnings ?? []),
+        key
+      ]))
+    })
+  }
+
+  const applyRecommendedImageSize = (
+    elementId: string,
+    widthMm?: number,
+    heightMm?: number
+  ) => {
+    if (!widthMm || !heightMm) return
+
+    onDraft({
+      ...draft,
+      acceptedWarnings: (draft.acceptedWarnings ?? []).filter(
+        key => !key.endsWith(`:${elementId}`)
+      ),
+      elements: draft.elements.map(element =>
+        element.id === elementId
+          ? { ...element, widthMm, heightMm }
+          : element
+      )
+    })
+  }
 
   return <div className="simple-screen"><Header/><main className="narrow">
     <StatusButton status={status} onClick={() => {}} />
@@ -1076,10 +1117,21 @@ function DesignCheck({ draft }: { draft: Draft }) {
       <p>{t('allChecksGoodHint')}</p>
     </div>}
 
-    {issues.map(issue =>
-      <div
-        key={issue.code + issue.elementId}
-        className={"check-card " + (issue.severity === 'BLOCKER' ? 'danger-card' : 'warning-card')}
+    {issues.map(issue => {
+      const element = draft.elements.find(item => item.id === issue.elementId)
+      const warningKey = `${issue.code}:${issue.elementId}`
+      const accepted = acceptedWarnings.has(warningKey)
+
+      return <div
+        key={warningKey}
+        className={
+          "check-card " +
+          (issue.severity === 'BLOCKER'
+            ? 'danger-card'
+            : accepted
+              ? 'accepted-warning'
+              : 'warning-card')
+        }
       >
         <b>{
           issue.code === 'LOW_DPI'
@@ -1088,16 +1140,64 @@ function DesignCheck({ draft }: { draft: Draft }) {
               ? t('worthChecking')
               : t('needsFix')
         }</b>
-        <p>
-          {issue.code === 'LOW_DPI'
-            ? `${t('warningImageHint')} ${issue.value ?? ''} DPI`
-            : issue.code === 'OUTSIDE_PLACEMENT_FRAME'
+
+        {issue.code === 'LOW_DPI' ? <>
+          <p>
+            <strong>{element?.label ?? t('image')}</strong> · {issue.value ?? '—'} DPI
+          </p>
+          <p>{t('warningImageHint')}</p>
+
+          <div className="dpi-comparison">
+            <div>
+              <small>{t('currentPrintSize')}</small>
+              <b>
+                {element
+                  ? `${(element.widthMm / 10).toFixed(1)} × ${(element.heightMm / 10).toFixed(1)} cm`
+                  : '—'}
+              </b>
+            </div>
+            <span>→</span>
+            <div>
+              <small>{t('recommendedPrintSize')}</small>
+              <b>
+                {issue.recommendedWidthMm && issue.recommendedHeightMm
+                  ? `${(issue.recommendedWidthMm / 10).toFixed(1)} × ${(issue.recommendedHeightMm / 10).toFixed(1)} cm`
+                  : '—'}
+              </b>
+            </div>
+          </div>
+
+          <div className="issue-actions">
+            <button
+              className="btn secondary"
+              onClick={() => applyRecommendedImageSize(
+                issue.elementId,
+                issue.recommendedWidthMm,
+                issue.recommendedHeightMm
+              )}
+            >
+              {t('applyRecommendedSize')}
+            </button>
+
+            {!accepted ? <button
+              className="btn primary"
+              onClick={() => acknowledgeWarning(issue.code, issue.elementId)}
+            >
+              {t('continueWithBlur')}
+            </button> : <span className="warning-accepted">
+              ✓ {t('blurAccepted')}
+            </span>}
+          </div>
+        </> : <>
+          <p>
+            {issue.code === 'OUTSIDE_PLACEMENT_FRAME'
               ? 'Part of the design is outside your Placement Frame. Move the element or enlarge the frame.'
               : 'Part of the selected element is outside the production printable area.'}
-        </p>
-        <Link to="/editor">{t('edit')}</Link>
+          </p>
+          <Link to="/editor">{t('edit')}</Link>
+        </>}
       </div>
-    )}
+    })}
 
     {!issues.some(issue => issue.code === 'OUTSIDE_PRINT_AREA') && <>
       <div className="check-card good">✓ {t('placementGood')}</div>
