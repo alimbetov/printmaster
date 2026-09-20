@@ -24,9 +24,12 @@ import {
 } from './mock'
 import i18n from './i18n'
 import {
+  clampPrintZoneOffset,
   frameContainsElements,
   frameToMm,
+  getEffectivePrintZone,
   getFrameForSide,
+  getPrintZoneOffset,
   movePlacementFrameWithDesign,
   normalizePlacementFrame
 } from './placement'
@@ -36,10 +39,15 @@ const LOCAL_IMAGE_BUDGET_CHARS = 1_500_000
 const normalizeDraft = (draft: Draft): Draft => {
   const legacy = draft as Draft & {
     placementFrames?: Draft['placementFrames']
+    printZoneOffsets?: Draft['printZoneOffsets']
   }
 
   const next: Draft = {
     ...draft,
+    printZoneOffsets: {
+      FRONT: legacy.printZoneOffsets?.FRONT ?? { xMm: 0, yMm: 0 },
+      BACK: legacy.printZoneOffsets?.BACK ?? { xMm: 0, yMm: 0 }
+    },
     placementFrames: {
       FRONT: normalizePlacementFrame(legacy.placementFrames?.FRONT),
       BACK: normalizePlacementFrame(legacy.placementFrames?.BACK)
@@ -314,7 +322,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     })
   }
 
-  const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const baseZone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const zone = getEffectivePrintZone(draft, draft.activeSide, baseZone)
   const placementFrame = getFrameForSide(draft, draft.activeSide)
   const placementMm = frameToMm(placementFrame, zone)
   const maxZ = Math.max(0, ...draft.elements.map(element => element.zOrder))
@@ -501,9 +510,37 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     const oldProfile = getPrintProfile(draft.productId, draft.size)
     const nextProfile = getPrintProfile(draft.productId, size)
 
+    const nextOffsets = (['FRONT', 'BACK'] as Side[]).reduce((acc, side) => {
+      const oldBase = side === 'FRONT' ? oldProfile.front : oldProfile.back
+      const nextBase = side === 'FRONT' ? nextProfile.front : nextProfile.back
+      const oldEffective = getEffectivePrintZone(draft, side, oldBase)
+
+      const targetX = (oldEffective.xMm / oldProfile.garmentWidthMm) * nextProfile.garmentWidthMm
+      const targetY = (oldEffective.yMm / oldProfile.garmentHeightMm) * nextProfile.garmentHeightMm
+
+      acc[side] = clampPrintZoneOffset(
+        nextBase,
+        {
+          xMm: targetX - nextBase.xMm,
+          yMm: targetY - nextBase.yMm
+        },
+        nextProfile.garmentWidthMm,
+        nextProfile.garmentHeightMm
+      )
+      return acc
+    }, {} as Draft['printZoneOffsets'])
+
+    const nextDraftBase: Draft = {
+      ...draft,
+      size,
+      printZoneOffsets: nextOffsets
+    }
+
     const elements = draft.elements.map(element => {
-      const oldZone = element.side === 'FRONT' ? oldProfile.front : oldProfile.back
-      const nextZone = element.side === 'FRONT' ? nextProfile.front : nextProfile.back
+      const oldBase = element.side === 'FRONT' ? oldProfile.front : oldProfile.back
+      const nextBase = element.side === 'FRONT' ? nextProfile.front : nextProfile.back
+      const oldZone = getEffectivePrintZone(draft, element.side, oldBase)
+      const nextZone = getEffectivePrintZone(nextDraftBase, element.side, nextBase)
       const nx = (element.xMm - oldZone.xMm) / oldZone.widthMm
       const ny = (element.yMm - oldZone.yMm) / oldZone.heightMm
 
@@ -515,8 +552,7 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
     })
 
     commit({
-      ...draft,
-      size,
+      ...nextDraftBase,
       elements
     })
   }
@@ -1059,7 +1095,8 @@ function FinalPreview({ draft, onApprove }: { draft: Draft, onApprove: () => voi
   const [side, setSide] = useState<Side>(sides[0] ?? 'FRONT')
   const status = getDraftStatus(draft)
   const previewProfile = getPrintProfile(draft.productId, draft.size)
-  const previewZone = side === 'FRONT' ? previewProfile.front : previewProfile.back
+  const previewBaseZone = side === 'FRONT' ? previewProfile.front : previewProfile.back
+  const previewZone = getEffectivePrintZone(draft, side, previewBaseZone)
   const previewFrame = getFrameForSide(draft, side)
   const previewPlacement = frameToMm(previewFrame, previewZone)
 
