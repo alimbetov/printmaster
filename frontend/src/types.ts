@@ -63,12 +63,18 @@ export type PlacementFrameNormalized = {
   height: number
 }
 
+export type PrintZoneOffset = {
+  xMm: number
+  yMm: number
+}
+
 export type Draft = {
   id: string
   productId: string
   color: string
   size: Size
   activeSide: Side
+  printZoneOffsets: Record<Side, PrintZoneOffset>
   placementFrames: Record<Side, PlacementFrameNormalized>
   elements: DesignElement[]
   status: DraftStatus
