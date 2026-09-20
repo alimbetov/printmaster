@@ -407,7 +407,11 @@ export default function EditorCanvas({
       return (
         <CanvasImage
           key={element.id}
-          element={element}
+          element={{
+            ...element,
+            xMm: element.xMm + zoneDragDelta.xMm,
+            yMm: element.yMm + zoneDragDelta.yMm
+          }}
           scale={scale}
           selected={selectedId === element.id && !frameSelected && !printZoneSelected}
           onSelect={() => {
@@ -558,8 +562,8 @@ export default function EditorCanvas({
                 onDragEnd={event => commitPrintZoneMove(event.target as Konva.Rect)}
               />
               <Text
-                x={zone.xMm * scale + 7}
-                y={zone.yMm * scale + 7}
+                x={(zone.xMm + zoneDragDelta.xMm) * scale + 7}
+                y={(zone.yMm + zoneDragDelta.yMm) * scale + 7}
                 text={printZoneSelected ? "PRINT ZONE · DRAG" : "PRINT ZONE"}
                 fill={printZoneSelected ? '#ffcf8b' : '#a5a8b0'}
                 fontSize={10}
