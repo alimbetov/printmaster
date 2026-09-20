@@ -3,6 +3,7 @@ import type {
   Draft,
   PlacementFrameNormalized,
   PrintZone,
+  PrintZoneOffset,
   Side
 } from './types'
 
@@ -93,3 +94,67 @@ export const frameContainsElements = (
 
 export const getFrameForSide = (draft: Draft, side: Side) =>
   normalizePlacementFrame(draft.placementFrames?.[side])
+
+
+export const getPrintZoneOffset = (draft: Draft, side: Side): PrintZoneOffset =>
+  draft.printZoneOffsets?.[side] ?? { xMm: 0, yMm: 0 }
+
+export const getEffectivePrintZone = (
+  draft: Draft,
+  side: Side,
+  baseZone: PrintZone
+): PrintZone => {
+  const offset = getPrintZoneOffset(draft, side)
+  return {
+    ...baseZone,
+    xMm: baseZone.xMm + offset.xMm,
+    yMm: baseZone.yMm + offset.yMm
+  }
+}
+
+export const movePrintZoneWithDesign = (
+  draft: Draft,
+  side: Side,
+  nextOffset: PrintZoneOffset
+): Draft => {
+  const current = getPrintZoneOffset(draft, side)
+  const dxMm = nextOffset.xMm - current.xMm
+  const dyMm = nextOffset.yMm - current.yMm
+
+  return {
+    ...draft,
+    printZoneOffsets: {
+      ...draft.printZoneOffsets,
+      [side]: {
+        xMm: Number(nextOffset.xMm.toFixed(3)),
+        yMm: Number(nextOffset.yMm.toFixed(3))
+      }
+    },
+    elements: draft.elements.map(element =>
+      element.side === side
+        ? {
+            ...element,
+            xMm: Number((element.xMm + dxMm).toFixed(3)),
+            yMm: Number((element.yMm + dyMm).toFixed(3))
+          }
+        : element
+    )
+  }
+}
+
+export const clampPrintZoneOffset = (
+  baseZone: PrintZone,
+  offset: PrintZoneOffset,
+  garmentWidthMm: number,
+  garmentHeightMm: number
+): PrintZoneOffset => {
+  const minX = -baseZone.xMm
+  const maxX = garmentWidthMm - (baseZone.xMm + baseZone.widthMm)
+  const minY = -baseZone.yMm
+  const maxY = garmentHeightMm - (baseZone.yMm + baseZone.heightMm)
+
+  return {
+    xMm: Math.min(maxX, Math.max(minX, offset.xMm)),
+    yMm: Math.min(maxY, Math.max(minY, offset.yMm))
+  }
+}
