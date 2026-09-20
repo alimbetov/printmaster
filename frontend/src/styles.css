@@ -288,3 +288,12 @@ main{max-width:1440px;margin:0 auto}.hero{min-height:680px;display:grid;grid-tem
   color:#111;
   border-color:#d9d0ff;
 }
+
+.dpi-comparison{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:14px 0;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.5)}
+.dpi-comparison>div{display:flex;flex-direction:column;gap:4px}
+.dpi-comparison small{color:var(--muted)}
+.issue-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.issue-actions .btn{width:auto}
+.accepted-warning{border-color:#b8c9bc;background:#f4faf5}
+.warning-accepted{font-weight:800;color:#376a43}
+@media(max-width:560px){.dpi-comparison{grid-template-columns:1fr}.dpi-comparison>span{display:none}.issue-actions .btn{width:100%}}
