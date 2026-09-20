@@ -3,10 +3,12 @@ import type {
   DraftStatus,
   MockPrintProfile,
   PreflightIssue,
+  PlacementFrameNormalized,
   Product,
   Side,
   Size
 } from './types'
+import { frameToMm, getEffectivePrintZone, getFrameForSide } from './placement'
 
 export const products: Product[] = [
   {
@@ -141,6 +143,13 @@ export const getPrintProfile = (productId: string, size: Size): MockPrintProfile
   }
 }
 
+export const defaultPlacementFrame = (): PlacementFrameNormalized => ({
+  x: .08,
+  y: .08,
+  width: .84,
+  height: .84
+})
+
 export const fontCatalog = [
   { id: 'inter', name: 'Inter', family: 'Inter, Arial, sans-serif', category: 'Clean' },
   { id: 'arial', name: 'Arial', family: 'Arial, sans-serif', category: 'Clean' },
@@ -161,6 +170,14 @@ export const createDraft = (productId = 'hoodie-basic', size: Size = 'L'): Draft
   color: product.colors[0].code,
   size,
   activeSide: 'FRONT',
+  printZoneOffsets: {
+    FRONT: { xMm: 0, yMm: 0 },
+    BACK: { xMm: 0, yMm: 0 }
+  },
+  placementFrames: {
+    FRONT: defaultPlacementFrame(),
+    BACK: defaultPlacementFrame()
+  },
   status: 'READY',
   elements: [
     {
@@ -199,8 +216,10 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
   const issues: PreflightIssue[] = []
 
   for (const element of draft.elements) {
-    const zone = element.side === 'FRONT' ? profile.front : profile.back
+    const baseZone = element.side === 'FRONT' ? profile.front : profile.back
+    const zone = getEffectivePrintZone(draft, element.side, baseZone)
     const half = rotatedHalfExtents(element.widthMm, element.heightMm, element.rotationDeg)
+    const placement = frameToMm(getFrameForSide(draft, element.side), zone)
 
     const left = element.xMm - half.x
     const right = element.xMm + half.x
@@ -221,6 +240,19 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
     }
 
     if (
+      left < placement.xMm ||
+      right > placement.xMm + placement.widthMm ||
+      top < placement.yMm ||
+      bottom > placement.yMm + placement.heightMm
+    ) {
+      issues.push({
+        code: 'OUTSIDE_PLACEMENT_FRAME',
+        severity: 'WARNING',
+        elementId: element.id
+      })
+    }
+
+    if (
       element.type === 'IMAGE' &&
       element.sourceWidthPx &&
       element.sourceHeightPx
@@ -230,11 +262,21 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
       const effectiveDpi = Math.round(Math.min(dpiX, dpiY))
 
       if (effectiveDpi < 150) {
+        const recommendedWidthMm = element.sourceWidthPx / 150 * 25.4
+        const recommendedHeightMm = element.sourceHeightPx / 150 * 25.4
+        const fitScale = Math.min(
+          recommendedWidthMm / element.widthMm,
+          recommendedHeightMm / element.heightMm,
+          1
+        )
+
         issues.push({
           code: 'LOW_DPI',
-          severity: effectiveDpi < 100 ? 'BLOCKER' : 'WARNING',
+          severity: 'WARNING',
           elementId: element.id,
-          value: effectiveDpi
+          value: effectiveDpi,
+          recommendedWidthMm: Number((element.widthMm * fitScale).toFixed(2)),
+          recommendedHeightMm: Number((element.heightMm * fitScale).toFixed(2))
         })
       }
     }
@@ -245,9 +287,16 @@ export const getPreflightIssues = (draft: Draft): PreflightIssue[] => {
 
 export const getDraftStatus = (draft: Draft): DraftStatus => {
   if (draft.elements.length === 0) return 'DRAFT'
+  const accepted = new Set(draft.acceptedWarnings ?? [])
   const issues = getPreflightIssues(draft)
   if (issues.some(issue => issue.severity === 'BLOCKER')) return 'BLOCKED'
-  if (issues.length > 0) return 'WARNING'
+
+  const actionableIssues = issues.filter(issue => {
+    const key = `${issue.code}:${issue.elementId}`
+    return !accepted.has(key)
+  })
+
+  if (actionableIssues.length > 0) return 'WARNING'
   return 'READY'
 }
 

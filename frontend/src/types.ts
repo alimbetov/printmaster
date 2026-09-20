@@ -56,13 +56,28 @@ export type DesignElement = {
 
 export type DraftStatus = 'DRAFT' | 'READY' | 'WARNING' | 'BLOCKED'
 
+export type PlacementFrameNormalized = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export type PrintZoneOffset = {
+  xMm: number
+  yMm: number
+}
+
 export type Draft = {
   id: string
   productId: string
   color: string
   size: Size
   activeSide: Side
+  printZoneOffsets: Record<Side, PrintZoneOffset>
+  placementFrames: Record<Side, PlacementFrameNormalized>
   elements: DesignElement[]
+  acceptedWarnings?: string[]
   status: DraftStatus
 }
 
@@ -86,8 +101,10 @@ export type MockPrintProfile = {
 }
 
 export type PreflightIssue = {
-  code: 'OUTSIDE_PRINT_AREA' | 'LOW_DPI'
+  code: 'OUTSIDE_PRINT_AREA' | 'OUTSIDE_PLACEMENT_FRAME' | 'LOW_DPI'
   severity: 'BLOCKER' | 'WARNING'
   elementId: string
   value?: number
+  recommendedWidthMm?: number
+  recommendedHeightMm?: number
 }

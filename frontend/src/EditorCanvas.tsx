@@ -9,8 +9,25 @@ import {
   Text,
   Transformer
 } from 'react-konva'
-import type { Draft, DesignElement, MockPrintProfile } from './types'
+import type {
+  Draft,
+  DesignElement,
+  MockPrintProfile,
+  PlacementFrameNormalized
+} from './types'
 import { getPrintProfile } from './mock'
+import {
+  clampPrintZoneOffset,
+  frameContainsElements,
+  frameFromMm,
+  frameToMm,
+  getEffectivePrintZone,
+  getFrameForSide,
+  getPrintZoneOffset,
+  movePlacementFrameWithDesign,
+  movePrintZoneWithDesign,
+  normalizePlacementFrame
+} from './placement'
 
 type Props = {
   draft: Draft
@@ -20,6 +37,8 @@ type Props = {
   onChange: (draft: Draft) => void
   readOnly?: boolean
   zoom?: number
+  panX?: number
+  panY?: number
 }
 
 function useElementImage(src?: string) {
@@ -134,15 +153,30 @@ export default function EditorCanvas({
   onSelect,
   onChange,
   readOnly = false,
-  zoom = 1
+  zoom = 1,
+  panX = 0,
+  panY = 0
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
-  const transformerRef = useRef<Konva.Transformer>(null)
+  const elementTransformerRef = useRef<Konva.Transformer>(null)
+  const frameRef = useRef<Konva.Rect>(null)
+  const frameTransformerRef = useRef<Konva.Transformer>(null)
   const [viewport, setViewport] = useState({ width: 600, height: 700 })
+  const [frameSelected, setFrameSelected] = useState(false)
+  const [printZoneSelected, setPrintZoneSelected] = useState(false)
+  const [zoneDragDelta, setZoneDragDelta] = useState({ xMm: 0, yMm: 0 })
 
   const profile = getPrintProfile(draft.productId, draft.size)
-  const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const baseZone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const zone = getEffectivePrintZone(draft, draft.activeSide, baseZone)
+  const placementFrame = getFrameForSide(draft, draft.activeSide)
+  const placementMm = frameToMm(placementFrame, zone)
+  const previewPlacementMm = {
+    ...placementMm,
+    xMm: placementMm.xMm + zoneDragDelta.xMm,
+    yMm: placementMm.yMm + zoneDragDelta.yMm
+  }
 
   useEffect(() => {
     const element = containerRef.current
@@ -160,6 +194,12 @@ export default function EditorCanvas({
     observer.observe(element)
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => {
+    setFrameSelected(false)
+    setPrintZoneSelected(false)
+    setZoneDragDelta({ xMm: 0, yMm: 0 })
+  }, [draft.activeSide])
 
   const scale = useMemo(() => {
     const horizontal = (viewport.width - 32) / profile.garmentWidthMm
@@ -181,11 +221,11 @@ export default function EditorCanvas({
   const selectedElement = activeElements.find(element => element.id === selectedId) ?? null
 
   useEffect(() => {
-    const transformer = transformerRef.current
+    const transformer = elementTransformerRef.current
     const stage = stageRef.current
     if (!transformer || !stage) return
 
-    if (!selectedId) {
+    if (!selectedId || frameSelected || printZoneSelected) {
       transformer.nodes([])
       transformer.getLayer()?.batchDraw()
       return
@@ -194,16 +234,15 @@ export default function EditorCanvas({
     const node = stage.findOne(`#element-${selectedId}`)
     transformer.nodes(node ? [node] : [])
     transformer.getLayer()?.batchDraw()
-  }, [selectedId, activeElements, scale])
+  }, [selectedId, frameSelected, printZoneSelected, activeElements, scale])
 
-  const updateElement = (id: string, patch: Partial<DesignElement>) => {
-    onChange({
-      ...draft,
-      elements: draft.elements.map(element =>
-        element.id === id ? { ...element, ...patch } : element
-      )
-    })
-  }
+  useEffect(() => {
+    const transformer = frameTransformerRef.current
+    const frame = frameRef.current
+    if (!transformer || !frame) return
+    transformer.nodes(frameSelected && !printZoneSelected && !readOnly ? [frame] : [])
+    transformer.getLayer()?.batchDraw()
+  }, [frameSelected, printZoneSelected, readOnly, placementFrame, scale])
 
   const commitNode = (element: DesignElement, node: Konva.Node) => {
     const nextScaleX = node.scaleX()
@@ -215,12 +254,125 @@ export default function EditorCanvas({
     node.scaleX(1)
     node.scaleY(1)
 
-    updateElement(element.id, {
-      xMm: Number((node.x() / scale).toFixed(3)),
-      yMm: Number((node.y() / scale).toFixed(3)),
-      widthMm: Number(nextWidth.toFixed(3)),
-      heightMm: Number(nextHeight.toFixed(3)),
-      rotationDeg: Number((((node.rotation() % 360) + 360) % 360).toFixed(2))
+    onChange({
+      ...draft,
+      acceptedWarnings: (draft.acceptedWarnings ?? []).filter(
+        key => !key.endsWith(`:${element.id}`)
+      ),
+      elements: draft.elements.map(item =>
+        item.id === element.id
+          ? {
+              ...item,
+              xMm: Number((node.x() / scale).toFixed(3)),
+              yMm: Number((node.y() / scale).toFixed(3)),
+              widthMm: Number(nextWidth.toFixed(3)),
+              heightMm: Number(nextHeight.toFixed(3)),
+              rotationDeg: Number((((node.rotation() % 360) + 360) % 360).toFixed(2))
+            }
+          : item
+      )
+    })
+  }
+
+  const bodyBounds = {
+    leftMm: profile.garmentWidthMm * .18,
+    rightMm: profile.garmentWidthMm * .82,
+    topMm: profile.garmentHeightMm * .10,
+    bottomMm: profile.garmentHeightMm * .94
+  }
+
+  const commitPrintZoneMove = (node: Konva.Rect) => {
+    const rawOffset = {
+      xMm: node.x() / scale - baseZone.xMm,
+      yMm: node.y() / scale - baseZone.yMm
+    }
+
+    const garmentClamped = clampPrintZoneOffset(
+      baseZone,
+      rawOffset,
+      profile.garmentWidthMm,
+      profile.garmentHeightMm
+    )
+
+    const minXOffset = bodyBounds.leftMm - baseZone.xMm
+    const maxXOffset = bodyBounds.rightMm - (baseZone.xMm + baseZone.widthMm)
+    const minYOffset = bodyBounds.topMm - baseZone.yMm
+    const maxYOffset = bodyBounds.bottomMm - (baseZone.yMm + baseZone.heightMm)
+
+    const nextOffset = {
+      xMm: Math.min(maxXOffset, Math.max(minXOffset, garmentClamped.xMm)),
+      yMm: Math.min(maxYOffset, Math.max(minYOffset, garmentClamped.yMm))
+    }
+
+    setZoneDragDelta({ xMm: 0, yMm: 0 })
+    onChange(movePrintZoneWithDesign(
+      draft,
+      draft.activeSide,
+      nextOffset
+    ))
+  }
+
+  const commitFrameMove = (node: Konva.Rect) => {
+    const widthPx = placementMm.widthMm * scale
+    const heightPx = placementMm.heightMm * scale
+    const minX = zone.xMm * scale
+    const minY = zone.yMm * scale
+    const maxX = (zone.xMm + zone.widthMm) * scale - widthPx
+    const maxY = (zone.yMm + zone.heightMm) * scale - heightPx
+
+    const xPx = Math.min(maxX, Math.max(minX, node.x()))
+    const yPx = Math.min(maxY, Math.max(minY, node.y()))
+
+    node.position({ x: xPx, y: yPx })
+
+    const next = frameFromMm({
+      xMm: xPx / scale,
+      yMm: yPx / scale,
+      widthMm: placementMm.widthMm,
+      heightMm: placementMm.heightMm
+    }, zone)
+
+    onChange(movePlacementFrameWithDesign(
+      draft,
+      draft.activeSide,
+      next,
+      zone
+    ))
+  }
+
+  const commitFrameResize = (node: Konva.Rect) => {
+    const nextRect = {
+      xMm: node.x() / scale,
+      yMm: node.y() / scale,
+      widthMm: Math.abs(node.width() * node.scaleX()) / scale,
+      heightMm: Math.abs(node.height() * node.scaleY()) / scale
+    }
+
+    node.scaleX(1)
+    node.scaleY(1)
+
+    const next = normalizePlacementFrame(frameFromMm(nextRect, zone))
+    const sideElements = draft.elements.filter(element => element.side === draft.activeSide)
+
+    if (!frameContainsElements(next, zone, sideElements)) {
+      node.position({
+        x: placementMm.xMm * scale,
+        y: placementMm.yMm * scale
+      })
+      node.size({
+        width: placementMm.widthMm * scale,
+        height: placementMm.heightMm * scale
+      })
+      alert('Placement frame cannot exclude existing design elements. Move the elements first or enlarge the frame.')
+      return
+    }
+
+    onChange({
+      ...draft,
+      placementFrames: {
+        ...draft.placementFrames,
+        [draft.activeSide]: next
+      }
     })
   }
 
@@ -229,16 +381,24 @@ export default function EditorCanvas({
     const height = element.heightMm * scale
     const common = {
       id: `element-${element.id}`,
-      x: element.xMm * scale,
-      y: element.yMm * scale,
+      x: (element.xMm + zoneDragDelta.xMm) * scale,
+      y: (element.yMm + zoneDragDelta.yMm) * scale,
       width,
       height,
       offsetX: width / 2,
       offsetY: height / 2,
       rotation: element.rotationDeg,
       draggable: !readOnly,
-      onClick: readOnly ? undefined : () => onSelect(element.id),
-      onTap: readOnly ? undefined : () => onSelect(element.id),
+      onClick: readOnly ? undefined : () => {
+        setFrameSelected(false)
+        setPrintZoneSelected(false)
+        onSelect(element.id)
+      },
+      onTap: readOnly ? undefined : () => {
+        setFrameSelected(false)
+        setPrintZoneSelected(false)
+        onSelect(element.id)
+      },
       onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) =>
         commitNode(element, event.target),
       onTransformEnd: (event: Konva.KonvaEventObject<Event>) =>
@@ -249,10 +409,18 @@ export default function EditorCanvas({
       return (
         <CanvasImage
           key={element.id}
-          element={element}
+          element={{
+            ...element,
+            xMm: element.xMm + zoneDragDelta.xMm,
+            yMm: element.yMm + zoneDragDelta.yMm
+          }}
           scale={scale}
-          selected={selectedId === element.id}
-          onSelect={() => onSelect(element.id)}
+          selected={selectedId === element.id && !frameSelected && !printZoneSelected}
+          onSelect={() => {
+            setFrameSelected(false)
+            setPrintZoneSelected(false)
+            onSelect(element.id)
+          }}
           onCommit={node => commitNode(element, node)}
           readOnly={readOnly}
         />
@@ -263,7 +431,7 @@ export default function EditorCanvas({
       <Text
         key={element.id}
         {...common}
-        text={element.type === 'STICKER' ? element.label : element.label}
+        text={element.label}
         fill={element.fill ?? (garmentColor === '#f4f4f2' ? '#111214' : '#ffffff')}
         fontFamily={element.fontFamily ?? 'Inter, Arial, sans-serif'}
         fontStyle={
@@ -282,8 +450,8 @@ export default function EditorCanvas({
         letterSpacing={(element.letterSpacingMm ?? 0) * scale}
         lineHeight={element.lineHeight ?? 1}
         verticalAlign="middle"
-        stroke={selectedId === element.id ? '#6c4dff' : undefined}
-        strokeWidth={selectedId === element.id ? .8 : 0}
+        stroke={selectedId === element.id && !frameSelected && !printZoneSelected ? '#6c4dff' : undefined}
+        strokeWidth={selectedId === element.id && !frameSelected && !printZoneSelected ? .8 : 0}
       />
     )
   }
@@ -293,16 +461,31 @@ export default function EditorCanvas({
 
   return (
     <div ref={containerRef} className="konva-host">
-      <div className="konva-stage-wrap" style={{ width: stageWidth, height: stageHeight }}>
+      <div
+        className="konva-stage-wrap"
+        style={{
+          width: stageWidth,
+          height: stageHeight,
+          transform: `translate(${panX}px, ${panY}px)`
+        }}
+      >
         <Stage
           ref={stageRef}
           width={stageWidth}
           height={stageHeight}
           onMouseDown={event => {
-            if (!readOnly && event.target === event.target.getStage()) onSelect(null)
+            if (!readOnly && event.target === event.target.getStage()) {
+              setFrameSelected(false)
+              setPrintZoneSelected(false)
+              onSelect(null)
+            }
           }}
           onTouchStart={event => {
-            if (!readOnly && event.target === event.target.getStage()) onSelect(null)
+            if (!readOnly && event.target === event.target.getStage()) {
+              setFrameSelected(false)
+              setPrintZoneSelected(false)
+              onSelect(null)
+            }
           }}
         >
           <Layer listening={false}>
@@ -317,6 +500,7 @@ export default function EditorCanvas({
               shadowOpacity={.18}
               shadowOffsetY={12}
             />
+
             {draft.productId.includes('hoodie') && draft.activeSide === 'FRONT' && (
               <Rect
                 x={profile.garmentWidthMm * .31 * scale}
@@ -328,23 +512,160 @@ export default function EditorCanvas({
                 cornerRadius={12}
               />
             )}
-            {!readOnly && <Rect
-              x={zone.xMm * scale}
-              y={zone.yMm * scale}
-              width={zone.widthMm * scale}
-              height={zone.heightMm * scale}
-              stroke="#8c78ff"
-              strokeWidth={2}
-              dash={[8, 7]}
-              cornerRadius={8}
-              opacity={.72}
-            />}
+
+
           </Layer>
 
           <Layer>
+            {!readOnly && <>
+              <Rect
+                id="print-zone"
+                x={zone.xMm * scale}
+                y={zone.yMm * scale}
+                width={zone.widthMm * scale}
+                height={zone.heightMm * scale}
+                fill="rgba(255,255,255,.012)"
+                stroke={printZoneSelected ? '#ffb454' : '#858892'}
+                strokeWidth={printZoneSelected ? 2.5 : 1.5}
+                dash={printZoneSelected ? [] : [6, 7]}
+                cornerRadius={8}
+                draggable
+                dragBoundFunc={pos => {
+                  const minX = bodyBounds.leftMm * scale
+                  const maxX = (bodyBounds.rightMm - zone.widthMm) * scale
+                  const minY = bodyBounds.topMm * scale
+                  const maxY = (bodyBounds.bottomMm - zone.heightMm) * scale
+                  return {
+                    x: Math.min(maxX, Math.max(minX, pos.x)),
+                    y: Math.min(maxY, Math.max(minY, pos.y))
+                  }
+                }}
+                onClick={() => {
+                  setPrintZoneSelected(true)
+                  setFrameSelected(false)
+                  onSelect(null)
+                }}
+                onTap={() => {
+                  setPrintZoneSelected(true)
+                  setFrameSelected(false)
+                  onSelect(null)
+                }}
+                onDragStart={() => {
+                  setPrintZoneSelected(true)
+                  setFrameSelected(false)
+                  onSelect(null)
+                }}
+                onDragMove={event => {
+                  setZoneDragDelta({
+                    xMm: event.target.x() / scale - zone.xMm,
+                    yMm: event.target.y() / scale - zone.yMm
+                  })
+                }}
+                onDragEnd={event => commitPrintZoneMove(event.target as Konva.Rect)}
+              />
+              <Text
+                x={(zone.xMm + zoneDragDelta.xMm) * scale + 7}
+                y={(zone.yMm + zoneDragDelta.yMm) * scale + 7}
+                text={printZoneSelected ? "PRINT ZONE · DRAG" : "PRINT ZONE"}
+                fill={printZoneSelected ? '#ffcf8b' : '#a5a8b0'}
+                fontSize={10}
+                fontStyle={printZoneSelected ? 'bold' : 'normal'}
+                listening={false}
+              />
+
+              <Rect
+                ref={frameRef}
+                id="placement-frame"
+                x={previewPlacementMm.xMm * scale}
+                y={previewPlacementMm.yMm * scale}
+                width={placementMm.widthMm * scale}
+                height={placementMm.heightMm * scale}
+                fill="rgba(108,77,255,.035)"
+                stroke="#8c78ff"
+                strokeWidth={frameSelected ? 2.5 : 2}
+                dash={frameSelected ? [] : [10, 6]}
+                cornerRadius={8}
+                draggable
+                dragBoundFunc={pos => {
+                  const widthPx = placementMm.widthMm * scale
+                  const heightPx = placementMm.heightMm * scale
+                  const minX = zone.xMm * scale
+                  const minY = zone.yMm * scale
+                  const maxX = (zone.xMm + zone.widthMm) * scale - widthPx
+                  const maxY = (zone.yMm + zone.heightMm) * scale - heightPx
+                  return {
+                    x: Math.min(maxX, Math.max(minX, pos.x)),
+                    y: Math.min(maxY, Math.max(minY, pos.y))
+                  }
+                }}
+                onClick={() => {
+                  setFrameSelected(true)
+                  setPrintZoneSelected(false)
+                  onSelect(null)
+                }}
+                onTap={() => {
+                  setFrameSelected(true)
+                  setPrintZoneSelected(false)
+                  onSelect(null)
+                }}
+                onDragStart={() => {
+                  setFrameSelected(true)
+                  setPrintZoneSelected(false)
+                  onSelect(null)
+                }}
+                onDragEnd={event => commitFrameMove(event.target as Konva.Rect)}
+                onTransformEnd={event => commitFrameResize(event.target as Konva.Rect)}
+              />
+              <Text
+                x={previewPlacementMm.xMm * scale + 8}
+                y={previewPlacementMm.yMm * scale + 8}
+                text="PLACEMENT"
+                fill="#cfc5ff"
+                fontSize={10}
+                fontStyle="bold"
+                listening={false}
+              />
+              <Transformer
+                ref={frameTransformerRef}
+                rotateEnabled={false}
+                flipEnabled={false}
+                keepRatio={false}
+                enabledAnchors={[
+                  'top-left', 'top-center', 'top-right',
+                  'middle-left', 'middle-right',
+                  'bottom-left', 'bottom-center', 'bottom-right'
+                ]}
+                anchorSize={11}
+                anchorCornerRadius={5}
+                borderStroke="#8c78ff"
+                anchorFill="#ffffff"
+                anchorStroke="#6c4dff"
+                boundBoxFunc={(oldBox, newBox) => {
+                  const zoneLeft = zone.xMm * scale
+                  const zoneTop = zone.yMm * scale
+                  const zoneRight = (zone.xMm + zone.widthMm) * scale
+                  const zoneBottom = (zone.yMm + zone.heightMm) * scale
+
+                  if (
+                    newBox.width < 45 ||
+                    newBox.height < 45 ||
+                    newBox.x < zoneLeft ||
+                    newBox.y < zoneTop ||
+                    newBox.x + newBox.width > zoneRight ||
+                    newBox.y + newBox.height > zoneBottom
+                  ) {
+                    return oldBox
+                  }
+
+                  return newBox
+                }}
+              />
+            </>}
+
             {activeElements.map(renderElement)}
+
             {!readOnly && <Transformer
-              ref={transformerRef}
+              ref={elementTransformerRef}
               rotateEnabled
               keepRatio={selectedElement?.type !== 'TEXT'}
               flipEnabled={false}

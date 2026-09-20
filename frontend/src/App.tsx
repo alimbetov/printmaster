@@ -2,6 +2,7 @@ import { ChangeEvent, useState } from 'react'
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import EditorCanvas from './EditorCanvas'
+import BodyPreview3D from './BodyPreview3D'
 import type {
   ApprovedDesign,
   DesignElement,
@@ -22,11 +23,38 @@ import {
   readStoredJson
 } from './mock'
 import i18n from './i18n'
+import {
+  clampPrintZoneOffset,
+  frameContainsElements,
+  frameToMm,
+  getEffectivePrintZone,
+  getFrameForSide,
+  getPrintZoneOffset,
+  movePlacementFrameWithDesign,
+  movePrintZoneWithDesign,
+  normalizePlacementFrame
+} from './placement'
 
 const LOCAL_IMAGE_BUDGET_CHARS = 1_500_000
 
 const normalizeDraft = (draft: Draft): Draft => {
-  const next = { ...draft, elements: draft.elements.map(element => ({ ...element })) }
+  const legacy = draft as Draft & {
+    placementFrames?: Draft['placementFrames']
+    printZoneOffsets?: Draft['printZoneOffsets']
+  }
+
+  const next: Draft = {
+    ...draft,
+    printZoneOffsets: {
+      FRONT: legacy.printZoneOffsets?.FRONT ?? { xMm: 0, yMm: 0 },
+      BACK: legacy.printZoneOffsets?.BACK ?? { xMm: 0, yMm: 0 }
+    },
+    placementFrames: {
+      FRONT: normalizePlacementFrame(legacy.placementFrames?.FRONT),
+      BACK: normalizePlacementFrame(legacy.placementFrames?.BACK)
+    },
+    elements: draft.elements.map(element => ({ ...element }))
+  }
 
   for (const side of ['FRONT', 'BACK'] as Side[]) {
     const ordered = next.elements
@@ -84,7 +112,7 @@ function App() {
       <Route path="/products" element={<Catalog />} />
       <Route path="/products/:id" element={<ProductPage draft={draft} onDraft={updateDraft} />} />
       <Route path="/editor" element={<Editor draft={draft} onDraft={updateDraft} />} />
-      <Route path="/check" element={<DesignCheck draft={draft} />} />
+      <Route path="/check" element={<DesignCheck draft={draft} onDraft={updateDraft} />} />
       <Route path="/preview" element={<FinalPreview draft={draft} onApprove={approve} />} />
       <Route path="/cart" element={<Cart approved={approved} />} />
       <Route path="/checkout" element={<Checkout approved={approved} />} />
@@ -271,6 +299,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheet, setSheet] = useState<'ADD' | 'STYLE' | 'LAYERS' | null>(null)
   const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [viewMode, setViewMode] = useState<'FLAT' | 'BODY_3D'>('FLAT')
 
   const selected = draft.elements.find(element => element.id === selectedId) ?? null
   const activeElements = draft.elements
@@ -287,13 +317,20 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const updateElement = (id: string, patch: Partial<DesignElement>) => {
     commit({
       ...draft,
+      acceptedWarnings: (draft.acceptedWarnings ?? []).filter(
+        key => !key.endsWith(`:${id}`)
+      ),
       elements: draft.elements.map(element =>
         element.id === id ? { ...element, ...patch } : element
       )
     })
   }
 
-  const zone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const baseZone = draft.activeSide === 'FRONT' ? profile.front : profile.back
+  const zone = getEffectivePrintZone(draft, draft.activeSide, baseZone)
+  const placementFrame = getFrameForSide(draft, draft.activeSide)
+  const placementMm = frameToMm(placementFrame, zone)
+  const printZoneOffset = getPrintZoneOffset(draft, draft.activeSide)
   const maxZ = Math.max(0, ...draft.elements.map(element => element.zOrder))
 
   const addText = () => {
@@ -305,9 +342,9 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         type: 'TEXT',
         label: 'YOUR TEXT',
         side: draft.activeSide,
-        xMm: zone.xMm + zone.widthMm / 2,
-        yMm: zone.yMm + zone.heightMm / 2,
-        widthMm: Math.min(150, zone.widthMm * .72),
+        xMm: placementMm.xMm + placementMm.widthMm / 2,
+        yMm: placementMm.yMm + placementMm.heightMm / 2,
+        widthMm: Math.min(150, placementMm.widthMm * .72),
         heightMm: 42,
         rotationDeg: 0,
         zOrder: maxZ + 1,
@@ -333,8 +370,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         type: 'STICKER',
         label: '★',
         side: draft.activeSide,
-        xMm: zone.xMm + zone.widthMm / 2,
-        yMm: zone.yMm + zone.heightMm / 2,
+        xMm: placementMm.xMm + placementMm.widthMm / 2,
+        yMm: placementMm.yMm + placementMm.heightMm / 2,
         widthMm: 70,
         heightMm: 70,
         rotationDeg: 0,
@@ -374,8 +411,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       const image = new Image()
       image.onload = () => {
         const id = crypto.randomUUID()
-        const maxWidthMm = Math.min(150, zone.widthMm * .7)
-        const maxHeightMm = zone.heightMm * .7
+        const maxWidthMm = Math.min(150, placementMm.widthMm * .7)
+        const maxHeightMm = placementMm.heightMm * .7
         const sourceWidth = Math.max(image.naturalWidth, 1)
         const sourceHeight = Math.max(image.naturalHeight, 1)
         const fitScale = Math.min(
@@ -392,8 +429,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
             type: 'IMAGE',
             label: file.name,
             side: draft.activeSide,
-            xMm: zone.xMm + zone.widthMm / 2,
-            yMm: zone.yMm + zone.heightMm / 2,
+            xMm: placementMm.xMm + placementMm.widthMm / 2,
+            yMm: placementMm.yMm + placementMm.heightMm / 2,
             widthMm,
             heightMm,
             rotationDeg: 0,
@@ -439,8 +476,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const centerSelected = () => {
     if (!selected) return
     updateElement(selected.id, {
-      xMm: zone.xMm + zone.widthMm / 2,
-      yMm: zone.yMm + zone.heightMm / 2
+      xMm: placementMm.xMm + placementMm.widthMm / 2,
+      yMm: placementMm.yMm + placementMm.heightMm / 2
     })
   }
 
@@ -470,6 +507,92 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
   const setSide = (side: Side) => {
     setSelectedId(null)
     commit({ ...draft, activeSide: side })
+  }
+
+  const changeSize = (size: Size) => {
+    if (size === draft.size) return
+
+    const oldProfile = getPrintProfile(draft.productId, draft.size)
+    const nextProfile = getPrintProfile(draft.productId, size)
+
+    const nextOffsets = (['FRONT', 'BACK'] as Side[]).reduce((acc, side) => {
+      const oldBase = side === 'FRONT' ? oldProfile.front : oldProfile.back
+      const nextBase = side === 'FRONT' ? nextProfile.front : nextProfile.back
+      const oldEffective = getEffectivePrintZone(draft, side, oldBase)
+
+      const targetX = (oldEffective.xMm / oldProfile.garmentWidthMm) * nextProfile.garmentWidthMm
+      const targetY = (oldEffective.yMm / oldProfile.garmentHeightMm) * nextProfile.garmentHeightMm
+
+      acc[side] = clampPrintZoneOffset(
+        nextBase,
+        {
+          xMm: targetX - nextBase.xMm,
+          yMm: targetY - nextBase.yMm
+        },
+        nextProfile.garmentWidthMm,
+        nextProfile.garmentHeightMm
+      )
+      return acc
+    }, {} as Draft['printZoneOffsets'])
+
+    const nextDraftBase: Draft = {
+      ...draft,
+      size,
+      printZoneOffsets: nextOffsets
+    }
+
+    const elements = draft.elements.map(element => {
+      const oldBase = element.side === 'FRONT' ? oldProfile.front : oldProfile.back
+      const nextBase = element.side === 'FRONT' ? nextProfile.front : nextProfile.back
+      const oldZone = getEffectivePrintZone(draft, element.side, oldBase)
+      const nextZone = getEffectivePrintZone(nextDraftBase, element.side, nextBase)
+      const nx = (element.xMm - oldZone.xMm) / oldZone.widthMm
+      const ny = (element.yMm - oldZone.yMm) / oldZone.heightMm
+
+      return {
+        ...element,
+        xMm: Number((nextZone.xMm + nx * nextZone.widthMm).toFixed(3)),
+        yMm: Number((nextZone.yMm + ny * nextZone.heightMm).toFixed(3))
+      }
+    })
+
+    commit({
+      ...nextDraftBase,
+      elements
+    })
+  }
+
+  const resetPrintZone = () => {
+    commit(movePrintZoneWithDesign(
+      draft,
+      draft.activeSide,
+      { xMm: 0, yMm: 0 }
+    ))
+  }
+
+  const resetPlacementFrame = () => {
+    const target = normalizePlacementFrame({
+      x: .08,
+      y: .08,
+      width: .84,
+      height: .84
+    })
+    const candidate = movePlacementFrameWithDesign(
+      draft,
+      draft.activeSide,
+      target,
+      zone
+    )
+    const candidateElements = candidate.elements.filter(
+      element => element.side === draft.activeSide
+    )
+
+    if (!frameContainsElements(target, zone, candidateElements)) {
+      alert('Default Placement Frame would exclude existing elements after reset. Enlarge the frame or move the design first.')
+      return
+    }
+
+    commit(candidate)
   }
 
   const goPreview = () => {
@@ -503,23 +626,58 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
       </aside>
 
       <section className="canvas-area">
-        <EditorCanvas
+        <div className="canvas-mode-switch">
+          <button
+            className={viewMode === 'FLAT' ? 'active' : ''}
+            onClick={() => setViewMode('FLAT')}
+          >
+            Flat
+          </button>
+          <button
+            className={viewMode === 'BODY_3D' ? 'active' : ''}
+            onClick={() => {
+              setSelectedId(null)
+              setViewMode('BODY_3D')
+            }}
+          >
+            Body 3D
+          </button>
+        </div>
+
+        {viewMode === 'FLAT' ? <>
+          <EditorCanvas
+            draft={draft}
+            garmentColor={garmentColor}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onChange={commit}
+            zoom={zoom}
+            panX={pan.x}
+            panY={pan.y}
+          />
+          <div className="canvas-zoom">
+            <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
+            <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Fit</button>
+            <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
+            <span>{Math.round(zoom * 100)}%</span>
+          </div>
+          <div className="canvas-pan">
+            <button aria-label="Move workspace left" onClick={() => setPan(value => ({ ...value, x: value.x - 40 }))}>←</button>
+            <div>
+              <button aria-label="Move workspace up" onClick={() => setPan(value => ({ ...value, y: value.y - 40 }))}>↑</button>
+              <button aria-label="Center workspace" onClick={() => setPan({ x: 0, y: 0 })}>◎</button>
+              <button aria-label="Move workspace down" onClick={() => setPan(value => ({ ...value, y: value.y + 40 }))}>↓</button>
+            </div>
+            <button aria-label="Move workspace right" onClick={() => setPan(value => ({ ...value, x: value.x + 40 }))}>→</button>
+          </div>
+          {selected && <div className="measure">
+            {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
+          </div>}
+        </> : <BodyPreview3D
           draft={draft}
           garmentColor={garmentColor}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
           onChange={commit}
-          zoom={zoom}
-        />
-        <div className="canvas-zoom">
-          <button onClick={() => setZoom(value => Math.max(.65, Number((value - .15).toFixed(2))))}>−</button>
-          <button onClick={() => setZoom(1)}>Fit</button>
-          <button onClick={() => setZoom(value => Math.min(1.6, Number((value + .15).toFixed(2))))}>＋</button>
-          <span>{Math.round(zoom * 100)}%</span>
-        </div>
-        {selected && <div className="measure">
-          {(selected.widthMm / 10).toFixed(1)} × {(selected.heightMm / 10).toFixed(1)} cm
-        </div>}
+        />}
       </section>
 
       <aside className="context-panel">
@@ -531,8 +689,33 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
           color={draft.color}
           size={draft.size}
           onColor={color => commit({ ...draft, color })}
-          onSize={size => commit({ ...draft, size })}
+          onSize={changeSize}
         />
+
+        <div className="placement-summary print-zone-summary">
+          <div className="inspector-head">
+            <b>Print Zone Position</b>
+            <span>
+              {printZoneOffset.xMm >= 0 ? '+' : ''}{(printZoneOffset.xMm / 10).toFixed(1)} /
+              {' '}{printZoneOffset.yMm >= 0 ? '+' : ''}{(printZoneOffset.yMm / 10).toFixed(1)} cm
+            </span>
+          </div>
+          <small>
+            Drag the gray/orange PRINT ZONE border directly on the garment. Placement and artwork move with it.
+          </small>
+          <button onClick={resetPrintZone}>Reset print zone</button>
+        </div>
+
+        <div className="placement-summary">
+          <div className="inspector-head">
+            <b>Placement Frame</b>
+            <span>{(placementMm.widthMm / 10).toFixed(1)} × {(placementMm.heightMm / 10).toFixed(1)} cm</span>
+          </div>
+          <small>
+            Offset {(placementFrame.x * 100).toFixed(0)}% / {(placementFrame.y * 100).toFixed(0)}% inside Print Zone
+          </small>
+          <button onClick={resetPlacementFrame}>Reset placement</button>
+        </div>
 
         <div className="mini-card">
           <b>{t('designCheck')}</b>
@@ -543,8 +726,8 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
         <EditorInspector
           selected={selected}
           zoneCenter={{
-            xMm: zone.xMm + zone.widthMm / 2,
-            yMm: zone.yMm + zone.heightMm / 2
+            xMm: placementMm.xMm + placementMm.widthMm / 2,
+            yMm: placementMm.yMm + placementMm.heightMm / 2
           }}
           onUpdate={patch => selected && updateElement(selected.id, patch)}
           onDelete={removeSelected}
@@ -592,13 +775,13 @@ function Editor({ draft, onDraft }: { draft: Draft, onDraft: (draft: Draft) => v
             color={draft.color}
             size={draft.size}
             onColor={color => commit({ ...draft, color })}
-            onSize={size => commit({ ...draft, size })}
+            onSize={changeSize}
           />
           <EditorInspector
             selected={selected}
             zoneCenter={{
-              xMm: zone.xMm + zone.widthMm / 2,
-              yMm: zone.yMm + zone.heightMm / 2
+              xMm: placementMm.xMm + placementMm.widthMm / 2,
+              yMm: placementMm.yMm + placementMm.heightMm / 2
             }}
             onUpdate={patch => selected && updateElement(selected.id, patch)}
             onDelete={removeSelected}
@@ -882,10 +1065,53 @@ function StatusInline({ status }: { status: Draft['status'] }) {
   return <span>✓ {t('looksReady')}</span>
 }
 
-function DesignCheck({ draft }: { draft: Draft }) {
+function DesignCheck({
+  draft,
+  onDraft
+}: {
+  draft: Draft
+  onDraft: (draft: Draft) => void
+}) {
   const { t } = useTranslation()
   const issues = getPreflightIssues(draft)
   const status = getDraftStatus(draft)
+  const acceptedWarnings = new Set(draft.acceptedWarnings ?? [])
+  const hasUnacceptedLowDpi = issues.some(issue =>
+    issue.code === 'LOW_DPI' &&
+    !acceptedWarnings.has(`${issue.code}:${issue.elementId}`)
+  )
+  const hasBlockers = issues.some(issue => issue.severity === 'BLOCKER')
+
+  const acknowledgeWarning = (code: string, elementId: string) => {
+    const key = `${code}:${elementId}`
+    onDraft({
+      ...draft,
+      acceptedWarnings: Array.from(new Set([
+        ...(draft.acceptedWarnings ?? []),
+        key
+      ]))
+    })
+  }
+
+  const applyRecommendedImageSize = (
+    elementId: string,
+    widthMm?: number,
+    heightMm?: number
+  ) => {
+    if (!widthMm || !heightMm) return
+
+    onDraft({
+      ...draft,
+      acceptedWarnings: (draft.acceptedWarnings ?? []).filter(
+        key => !key.endsWith(`:${elementId}`)
+      ),
+      elements: draft.elements.map(element =>
+        element.id === elementId
+          ? { ...element, widthMm, heightMm }
+          : element
+      )
+    })
+  }
 
   return <div className="simple-screen"><Header/><main className="narrow">
     <StatusButton status={status} onClick={() => {}} />
@@ -896,29 +1122,101 @@ function DesignCheck({ draft }: { draft: Draft }) {
       <p>{t('allChecksGoodHint')}</p>
     </div>}
 
-    {issues.map(issue =>
-      <div
-        key={issue.code + issue.elementId}
-        className={"check-card " + (issue.severity === 'BLOCKER' ? 'danger-card' : 'warning-card')}
+    {issues.map(issue => {
+      const element = draft.elements.find(item => item.id === issue.elementId)
+      const warningKey = `${issue.code}:${issue.elementId}`
+      const accepted = acceptedWarnings.has(warningKey)
+
+      return <div
+        key={warningKey}
+        className={
+          "check-card " +
+          (issue.severity === 'BLOCKER'
+            ? 'danger-card'
+            : accepted
+              ? 'accepted-warning'
+              : 'warning-card')
+        }
       >
-        <b>{issue.code === 'LOW_DPI' ? t('warningImageTitle') : t('needsFix')}</b>
-        <p>
-          {issue.code === 'LOW_DPI'
-            ? `${t('warningImageHint')} ${issue.value ?? ''} DPI`
-            : 'Part of the selected element is outside the printable area.'}
-        </p>
-        <Link to="/editor">{t('edit')}</Link>
+        <b>{
+          issue.code === 'LOW_DPI'
+            ? t('warningImageTitle')
+            : issue.code === 'OUTSIDE_PLACEMENT_FRAME'
+              ? t('worthChecking')
+              : t('needsFix')
+        }</b>
+
+        {issue.code === 'LOW_DPI' ? <>
+          <p>
+            <strong>{element?.label ?? t('image')}</strong> · {issue.value ?? '—'} DPI
+          </p>
+          <p>{t('warningImageHint')}</p>
+
+          <div className="dpi-comparison">
+            <div>
+              <small>{t('currentPrintSize')}</small>
+              <b>
+                {element
+                  ? `${(element.widthMm / 10).toFixed(1)} × ${(element.heightMm / 10).toFixed(1)} cm`
+                  : '—'}
+              </b>
+            </div>
+            <span>→</span>
+            <div>
+              <small>{t('recommendedPrintSize')}</small>
+              <b>
+                {issue.recommendedWidthMm && issue.recommendedHeightMm
+                  ? `${(issue.recommendedWidthMm / 10).toFixed(1)} × ${(issue.recommendedHeightMm / 10).toFixed(1)} cm`
+                  : '—'}
+              </b>
+            </div>
+          </div>
+
+          <div className="issue-actions">
+            <button
+              className="btn secondary"
+              onClick={() => applyRecommendedImageSize(
+                issue.elementId,
+                issue.recommendedWidthMm,
+                issue.recommendedHeightMm
+              )}
+            >
+              {t('applyRecommendedSize')}
+            </button>
+
+            {!accepted ? <button
+              className="btn primary"
+              onClick={() => acknowledgeWarning(issue.code, issue.elementId)}
+            >
+              {t('continueWithBlur')}
+            </button> : <span className="warning-accepted">
+              ✓ {t('blurAccepted')}
+            </span>}
+          </div>
+        </> : <>
+          <p>
+            {issue.code === 'OUTSIDE_PLACEMENT_FRAME'
+              ? 'Part of the design is outside your Placement Frame. Move the element or enlarge the frame.'
+              : 'Part of the selected element is outside the production printable area.'}
+          </p>
+          <Link to="/editor">{t('edit')}</Link>
+        </>}
       </div>
-    )}
+    })}
 
     {!issues.some(issue => issue.code === 'OUTSIDE_PRINT_AREA') && <>
       <div className="check-card good">✓ {t('placementGood')}</div>
       <div className="check-card good">✓ {t('insideArea')}</div>
     </>}
 
-    {status === 'READY' || status === 'WARNING'
+    {!hasBlockers && !hasUnacceptedLowDpi
       ? <Link className="btn primary full" to="/preview">{t('continue')}</Link>
-      : <Link className="btn secondary full" to="/editor">{t('edit')}</Link>}
+      : hasUnacceptedLowDpi
+        ? <div className="check-card warning-card">
+            <b>{t('chooseImageQualityAction')}</b>
+            <p>{t('chooseImageQualityActionHint')}</p>
+          </div>
+        : <Link className="btn secondary full" to="/editor">{t('edit')}</Link>}
   </main></div>
 }
 
@@ -930,6 +1228,11 @@ function FinalPreview({ draft, onApprove }: { draft: Draft, onApprove: () => voi
   const sides = getSidesInUse(draft)
   const [side, setSide] = useState<Side>(sides[0] ?? 'FRONT')
   const status = getDraftStatus(draft)
+  const previewProfile = getPrintProfile(draft.productId, draft.size)
+  const previewBaseZone = side === 'FRONT' ? previewProfile.front : previewProfile.back
+  const previewZone = getEffectivePrintZone(draft, side, previewBaseZone)
+  const previewFrame = getFrameForSide(draft, side)
+  const previewPlacement = frameToMm(previewFrame, previewZone)
 
   const previewDraft = { ...draft, activeSide: side }
 
@@ -964,7 +1267,12 @@ function FinalPreview({ draft, onApprove }: { draft: Draft, onApprove: () => voi
       </div>
 
       <StatusInline status={status} />
-      <p className="muted">{t('printSize')}: 25 × 30 cm max</p>
+      <p className="muted">
+        Placement: {(previewPlacement.widthMm / 10).toFixed(1)} × {(previewPlacement.heightMm / 10).toFixed(1)} cm
+      </p>
+      <p className="muted">
+        Print zone: {(previewZone.widthMm / 10).toFixed(1)} × {(previewZone.heightMm / 10).toFixed(1)} cm
+      </p>
       <p className="note">{t('previewApprox')}</p>
 
       <div className="actions column">
